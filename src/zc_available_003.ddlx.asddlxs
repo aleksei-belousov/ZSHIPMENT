@@ -1,0 +1,51 @@
+@Metadata.layer: #CORE
+@UI: {
+    headerInfo: { typeName: 'Available',
+                  typeNamePlural: 'Availables',
+                  title: { type: #STANDARD, label: 'Available', value: 'AvailableUUID' } },
+    presentationVariant: [{ sortOrder: [{ by: 'AvailableUUID', direction: #ASC }] }] }
+//@Search.searchable: true
+
+annotate entity ZC_AVAILABLE_003 with 
+{
+
+    @UI.facet: [
+        {
+            id:            'Available',
+            purpose:       #STANDARD,
+            type:          #IDENTIFICATION_REFERENCE,
+            label:         'Available',
+            position:      10
+        }
+    ]
+
+    @UI.hidden: true
+    AvailableUUID;
+
+    @UI: {  lineItem:       [ { position: 10, label: 'Available ID', cssDefault.width: '200px' } ],
+            identification: [ { position: 10, label: 'Available ID' } ] }
+    @UI.hidden: true
+    AvailableID;
+
+    @UI.hidden: true
+    ShipmentUUID;
+
+    @UI: {  lineItem:       [ { position: 20, label: 'Outbound Delivery', cssDefault.width: '200px' } ],
+            identification: [ { position: 20, label: 'Outbound Delivery' } ] }
+    OutboundDelivery;
+
+    @UI.hidden: true
+    CreatedBy;
+
+    @UI.hidden: true
+    Createdat;
+
+    @UI.hidden: true
+    LastChangedBy;
+
+    @UI.hidden: true
+    LastChangedAt;
+
+    @UI.hidden: true
+    LocalLastChangedAt;
+}

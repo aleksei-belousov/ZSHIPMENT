@@ -1,0 +1,5 @@
+@EndUserText.label: 'Collective Processing'
+define service ZSD_VBSK_003 {
+  expose ZC_VBSK_003;
+  expose ZC_VBSS_003;
+}

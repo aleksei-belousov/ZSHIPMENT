@@ -1,0 +1,27 @@
+projection;
+strict ( 2 );
+use draft;
+use side effects;
+
+define behavior for ZC_VBSK_003 alias CollectiveProcessing
+{
+  use create;
+  use update;
+  use delete;
+
+  use action Prepare;
+  use action Resume;
+  use action Edit;
+  use action Activate;
+  use action Discard;
+
+  use association _CollectiveProcessingDocument { create;  with draft;}
+}
+
+define behavior for ZC_VBSS_003 alias CollectiveProcessingDocument
+{
+  use update;
+  use delete;
+
+  use association _CollectiveProcessing { with draft; }
+}

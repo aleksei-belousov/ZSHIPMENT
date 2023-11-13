@@ -1,0 +1,74 @@
+managed with additional save implementation in class zbp_i_shipment_003 unique;
+strict ( 2 );
+with draft;
+define behavior for ZI_SHIPMENT_003 alias Shipment
+persistent table zshipment003
+draft table zshipment003d
+lock master
+total etag LastChangedAt
+authorization master ( instance )
+etag master LocalLastChangedAt
+{
+
+  create;
+  update;
+  delete;
+
+  draft determine action Prepare;
+  draft action Resume with additional implementation;
+  draft action Edit with additional implementation;
+  draft action Activate with additional implementation optimized;
+  draft action Discard /*with additional implementation*/;
+
+  action retrieve;
+  action release;
+
+  association _Added {  create ( features : instance, authorization : update ); with draft; }
+  association _Available {  create ( features : instance, authorization : update ); with draft; }
+
+  field ( readonly, numbering : managed ) ShipmentUUID;
+
+  side effects
+  {
+    action retrieve affects entity _Available;
+  }
+
+}
+
+define behavior for ZI_AVAILABLE_003 alias Available
+persistent table zavailable003
+draft table zavailable003d
+lock dependent by _Shipment
+authorization dependent by _Shipment
+etag master LocalLastChangedAt
+{
+
+  update;
+  delete;
+
+  field ( readonly, numbering : managed ) AvailableUUID;
+  field ( readonly ) ShipmentUUID;
+  field ( readonly ) OutboundDelivery;
+
+  association _Shipment { with draft; }
+
+}
+
+define behavior for ZI_ADDED_003 alias Added
+persistent table zadded003
+draft table zadded003d
+lock dependent by _Shipment
+authorization dependent by _Shipment
+etag master LocalLastChangedAt
+{
+
+  update;
+  delete;
+
+  field ( readonly, numbering : managed ) AddedUUID;
+  field ( readonly ) ShipmentUUID;
+  field ( readonly ) OutboundDelivery;
+
+  association _Shipment { with draft; }
+
+}

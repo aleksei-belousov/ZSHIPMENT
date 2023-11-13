@@ -1,0 +1,52 @@
+@Metadata.layer: #CORE
+@UI: {
+    headerInfo: { typeName: 'Added',
+                  typeNamePlural: 'Added',
+                  title: { type: #STANDARD, label: 'Added', value: 'AddedUUID' } },
+    presentationVariant: [{ sortOrder: [{ by: 'AddedUUID', direction: #ASC }] }] }
+//@Search.searchable: true
+
+annotate entity ZC_ADDED_003 with 
+{
+
+     @UI.facet: [
+        {
+            id:            'Added',
+            purpose:       #STANDARD,
+            type:          #IDENTIFICATION_REFERENCE,
+            label:         'Added',
+            position:      10
+        }
+    ]
+ 
+    @UI.hidden: true
+    AddedUUID;
+
+    @UI: {  lineItem:       [ { position: 10, label: 'Added ID', cssDefault.width: '200px' } ],
+            identification: [ { position: 10, label: 'Added ID' } ] }
+    @UI.hidden: true
+    AddedID;
+
+    @UI.hidden: true
+    ShipmentUUID;
+
+    @UI: {  lineItem:       [ { position: 20, label: 'Outbound Delivery', cssDefault.width: '200px' } ],
+            identification: [ { position: 20, label: 'Outbound Delivery' } ] }
+    OutboundDelivery;
+
+    @UI.hidden: true
+    CreatedBy;
+
+    @UI.hidden: true
+    CreatedAt;
+
+    @UI.hidden: true
+    LastChangedBy;
+
+    @UI.hidden: true
+    LastChangedAt;
+
+    @UI.hidden: true
+    LocalLastChangedAt;
+   
+}

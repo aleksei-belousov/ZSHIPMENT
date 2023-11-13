@@ -1,0 +1,67 @@
+@Metadata.layer: #CORE
+@UI: {
+    headerInfo: { typeName: 'Shipment Binding',
+                  typeNamePlural: 'Shipment Bindings',
+                  title: { type: #STANDARD, label: 'Shipment Binding', value: 'ShipmentID' } },
+    presentationVariant: [{ sortOrder: [{ by: 'ShipmentUUID', direction: #ASC }] }] }
+//@Search.searchable: true
+
+annotate entity ZC_SHIPMENT_003 with 
+{
+
+    @UI.facet: [
+        // Shipment Binding (header) 
+        {
+            id:            'ShipmentBinding',
+            purpose:       #STANDARD,
+            type:          #IDENTIFICATION_REFERENCE,
+            label:         'Shipment',
+            position:      10
+        },
+        // Available
+        {
+            hidden:       false,
+            label:        'Available',
+            id:           'AvailableUUID',
+            purpose:      #STANDARD,
+            type:         #LINEITEM_REFERENCE,
+            position:     20,
+            targetElement: '_Available'
+         },
+        // Added
+        {
+            hidden:       false,
+            label:        'Added',
+            id:           'AddedUUID',
+            purpose:      #STANDARD,
+            type:         #LINEITEM_REFERENCE,
+            position:     30,
+            targetElement: '_Added'
+         }
+    ]
+
+    @UI.hidden: true
+    ShipmentUUID;
+
+    @UI: {  lineItem:       [ { position: 30, label: 'Collective Processing', cssDefault.width: '200px' } ],
+            identification: [ { position: 30, label: 'Collective Processing' },
+                              { type: #FOR_ACTION, dataAction: 'retrieve',  label: 'Retrieve',  position: 1 },
+                              { type: #FOR_ACTION, dataAction: 'release',   label: 'Release',   position: 2 } ] }
+    CollectiveProcessing;
+
+    @UI.hidden: true
+    CreatedBy;
+
+    @UI.hidden: true
+    CreatedAt;
+
+    @UI.hidden: true
+    LastChangedBy;
+
+    @UI.hidden: true
+    LastChangedAt;
+
+    @UI.hidden: true
+    LocalLastChangedAt;
+    
+}

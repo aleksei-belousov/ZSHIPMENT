@@ -1,0 +1,6 @@
+@EndUserText.label: 'ZSD_SHIPMENT_003'
+define service ZSD_SHIPMENT_003 {
+  expose ZC_SHIPMENT_003;
+  expose ZC_AVAILABLE_003;
+  expose ZC_ADDED_003;
+}

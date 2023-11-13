@@ -1,0 +1,47 @@
+@Metadata.layer: #CORE
+@UI: {
+    headerInfo: { typeName: 'Collective Processing Document',
+                  typeNamePlural: 'Collective Processing Documents',
+                  title: { type: #STANDARD, label: 'Collective Processing Document', value: 'CollectiveProcessingDocument' } },
+    presentationVariant: [{ sortOrder: [{ by: 'CollectiveProcessingDocument', direction: #ASC }] }] }
+//@Search.searchable: true
+
+annotate entity ZC_VBSS_003 with 
+{
+
+    @UI.facet: [
+        {
+            id:            'CollectiveProcessingDocument',
+            purpose:       #STANDARD,
+            type:          #IDENTIFICATION_REFERENCE,
+            label:         'Collective Processing Document',
+            position:      10
+        }
+    ]
+
+    @UI.hidden: true
+    ZvbssUUID;
+
+    @UI: {  lineItem:       [ { position: 10, label: 'Collective Processing Document', cssDefault.width: '200px' } ],
+            identification: [ { position: 10, label: 'Collective Processing Document' } ] }
+    CollectiveProcessingDocument;
+
+    @UI.hidden: true
+    ZvbskUUID;
+
+    @UI.hidden: true
+    CreatedBy;
+
+    @UI.hidden: true
+    CreatedAt;
+
+    @UI.hidden: true
+    LastChangedBy;
+
+    @UI.hidden: true
+    LastChangedAt;
+
+    @UI.hidden: true
+    LocalLastChangedat;
+
+}

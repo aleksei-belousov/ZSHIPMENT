@@ -1,0 +1,41 @@
+managed with additional save implementation in class zbp_i_vbsk_003 unique;
+strict ( 2 );
+with draft;
+define behavior for ZI_VBSK_003 alias CollectiveProcessing
+persistent table zvbsk003
+draft table zvbsk003d
+lock master
+total etag LastChangedAt
+authorization master ( instance )
+etag master LocalLastChangedAt
+{
+  create;
+  update;
+  delete;
+
+  draft determine action Prepare;
+  draft action Resume with additional implementation;
+  draft action Edit with additional implementation;
+  draft action Activate with additional implementation optimized;
+  draft action Discard /*with additional implementation*/;
+
+  association _CollectiveProcessingDocument { create; }
+
+  field ( readonly, numbering : managed ) ZvbskUUID;
+}
+
+define behavior for ZI_VBSS_003 alias CollectiveProcessingDocument
+persistent table zvbss003
+draft table zvbss003d
+lock dependent by _CollectiveProcessing
+authorization dependent by _CollectiveProcessing
+etag master LocalLastChangedAt
+{
+  update;
+  delete;
+
+  field ( readonly, numbering : managed ) ZvbssUUID;
+  field ( readonly ) ZvbskUUID;
+
+  association _CollectiveProcessing;
+}
