@@ -20,17 +20,25 @@ etag master LocalLastChangedAt
   draft action Activate with additional implementation optimized;
   draft action Discard /*with additional implementation*/;
 
+  // Actions:
   action retrieve;
   action release;
 
+  // Events:
+  determination on_create on modify { field ShipmentUUID; }
+
+  // Associations:
   association _Added {  create ( features : instance, authorization : update ); with draft; }
   association _Available {  create ( features : instance, authorization : update ); with draft; }
 
   field ( readonly, numbering : managed ) ShipmentUUID;
+  field ( readonly ) ShipmentID;
+  field ( readonly ) Released;
 
   side effects
   {
     action retrieve affects entity _Available;
+    action release affects field Released;
   }
 
 }
@@ -48,7 +56,7 @@ etag master LocalLastChangedAt
 
   field ( readonly, numbering : managed ) AvailableUUID;
   field ( readonly ) ShipmentUUID;
-  field ( readonly ) OutboundDelivery;
+//  field ( readonly ) OutboundDelivery;
 
   association _Shipment { with draft; }
 

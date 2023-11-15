@@ -21,13 +21,13 @@ annotate entity ZC_SHIPMENT_003 with
         // Available
         {
             hidden:       false,
-            label:        'Available',
+            label:        'Delivery',
             id:           'AvailableUUID',
             purpose:      #STANDARD,
             type:         #LINEITEM_REFERENCE,
             position:     20,
             targetElement: '_Available'
-         },
+         }/*,
         // Added
         {
             hidden:       false,
@@ -38,16 +38,31 @@ annotate entity ZC_SHIPMENT_003 with
             position:     30,
             targetElement: '_Added'
          }
+         */
     ]
 
     @UI.hidden: true
     ShipmentUUID;
 
-    @UI: {  lineItem:       [ { position: 30, label: 'Collective Processing', cssDefault.width: '200px' } ],
-            identification: [ { position: 30, label: 'Collective Processing' },
-                              { type: #FOR_ACTION, dataAction: 'retrieve',  label: 'Retrieve',  position: 1 },
+    @UI: {  lineItem:       [ { position: 20, label: 'Shipment ID', cssDefault.width: '200px' } ],
+            identification: [ { position: 20, label: 'Shipment ID' }/*, 
+                              { type: #FOR_ACTION, dataAction: 'retrieve',  label: 'Retrieve',  position: 1 }*/,
                               { type: #FOR_ACTION, dataAction: 'release',   label: 'Release',   position: 2 } ] }
+    ShipmentID;
+
+    @UI: {  lineItem:       [ { position: 30, label: 'Collective Processing', cssDefault.width: '200px' } ],
+            identification: [ { position: 30, label: 'Collective Processing' } ] }
+    @UI.hidden: true
     CollectiveProcessing;
+
+    @UI: {  lineItem:       [ { position: 40, label: 'Sold To Party', cssDefault.width: '200px' } ],
+            identification: [ { position: 40, label: 'Sold To Party' } ] }
+    @UI.hidden: true
+    SoldToParty;
+
+    @UI: {  lineItem:       [ { position: 50, label: 'Released', cssDefault.width: '200px' } ],
+            identification: [ { position: 50, label: 'Released' } ] }
+    Released;
 
     @UI.hidden: true
     CreatedBy;

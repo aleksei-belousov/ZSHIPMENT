@@ -4,10 +4,17 @@
 define root view entity ZC_SHIPMENT_003 provider contract transactional_query as projection on ZI_SHIPMENT_003 as Shipment
 {
     key ShipmentUUID,
+    ShipmentID,
 
     @Consumption.valueHelpDefinition: [ { entity: { name: 'ZI_VBSK_003', element: 'CollectiveProcessing' } } ]
     @EndUserText.label: 'Collective Processing'
     CollectiveProcessing, 
+
+    @Consumption.valueHelpDefinition: [ { entity: { name: 'I_Customer', element: 'Customer' } } ]
+    @EndUserText.label: 'Sold To Party'
+    SoldToParty as SoldToParty,
+    
+    Released,
 
     CreatedBy,
     CreatedAt,

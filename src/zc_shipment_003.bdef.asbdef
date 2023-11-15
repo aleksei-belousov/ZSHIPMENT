@@ -19,13 +19,13 @@ define behavior for ZC_SHIPMENT_003 alias Shipment
   use action release;
 
   use association _Added { /*create;*/ with draft;}
-  use association _Available { /*create;*/ with draft;}
+  use association _Available { create; with draft;}
 }
 
 define behavior for ZC_AVAILABLE_003 alias Available
 {
   use update;
-//  use delete;
+  use delete;
 
   use association _Shipment { with draft; }
 }

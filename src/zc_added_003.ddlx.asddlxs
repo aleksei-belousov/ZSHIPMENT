@@ -22,11 +22,6 @@ annotate entity ZC_ADDED_003 with
     @UI.hidden: true
     AddedUUID;
 
-    @UI: {  lineItem:       [ { position: 10, label: 'Added ID', cssDefault.width: '200px' } ],
-            identification: [ { position: 10, label: 'Added ID' } ] }
-    @UI.hidden: true
-    AddedID;
-
     @UI.hidden: true
     ShipmentUUID;
 

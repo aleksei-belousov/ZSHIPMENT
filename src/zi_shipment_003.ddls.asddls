@@ -5,7 +5,10 @@ composition [0..*] of ZI_AVAILABLE_003 as _Available
 composition [0..*] of ZI_ADDED_003 as _Added
 {
     key shipmentuuid as ShipmentUUID,
+    shipmentid as ShipmentID,
     collectiveprocessing as CollectiveProcessing, 
+    soldtoparty as SoldToParty,
+    released as Released,
     
     createdby as CreatedBy,
     createdat as CreatedAt,

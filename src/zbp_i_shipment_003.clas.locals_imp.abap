@@ -22,6 +22,8 @@ CLASS lhc_shipment DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
     METHODS release FOR MODIFY
       IMPORTING keys FOR ACTION Shipment~release.
+    METHODS on_create FOR DETERMINE ON MODIFY
+      IMPORTING keys FOR Shipment~on_create.
 
 ENDCLASS. " lhc_shipment DEFINITION
 
@@ -160,8 +162,213 @@ CLASS lhc_shipment IMPLEMENTATION.
 
   ENDMETHOD. " retrieve
 
-  METHOD release.
-  ENDMETHOD.
+  METHOD release. " on Pressing Release button
+
+    " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Shipment
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+
+            IF ( <entity>-Released = abap_true ).
+*               Short format message
+                APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'The Shipment Binding is already released.' ) ) TO reported-shipment.
+                RETURN.
+            ENDIF.
+
+            READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+                ENTITY Shipment
+                BY \_Available
+                ALL FIELDS WITH VALUE #( (
+                    %tky = <entity>-%tky
+                ) )
+                RESULT DATA(lt_available)
+                FAILED DATA(failed1)
+                REPORTED DATA(reported1).
+
+            IF ( lt_available[] IS INITIAL ).
+*               Short format message
+                APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'No Outbould Deliveres.' ) ) TO reported-shipment.
+                RETURN.
+            ENDIF.
+
+            SORT lt_available STABLE BY OutboundDelivery.
+
+            DATA request_body TYPE string VALUE ''.
+
+*           Make body as a CSV
+*            LOOP AT lt_available INTO DATA(ls_available).
+*                 request_body = request_body && ls_available-OutboundDelivery && cl_abap_char_utilities=>cr_lf.
+*            ENDLOOP.
+
+*           Make body as an XML
+            request_body = request_body && '<ShipmentBinding>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<ID>' && <entity>-ShipmentID && '</ID>' && cl_abap_char_utilities=>cr_lf.
+            LOOP AT lt_available INTO DATA(ls_available).
+                request_body = request_body && '<OutboundDelivery>' && cl_abap_char_utilities=>cr_lf.
+                request_body = request_body && '<ID>' && ls_available-OutboundDelivery && '</ID>' && cl_abap_char_utilities=>cr_lf.
+                request_body = request_body && '</OutboundDelivery>' && cl_abap_char_utilities=>cr_lf.
+            ENDLOOP.
+            request_body = request_body && '</ShipmentBinding>' && cl_abap_char_utilities=>cr_lf.
+
+*           Do Free Style HTTP Request
+            TRY.
+
+                DATA i_url         TYPE string VALUE 'https://felina-hu-scpi-test-eyjk96r2.it-cpi018-rt.cfapps.eu10-003.hana.ondemand.com/http/FiegeShipmentBindingRequest'.
+                DATA i_username    TYPE string VALUE 'sb-1e950f89-c676-4acd-b0dc-24e58f8aab45!b143168|it-rt-felina-hu-scpi-test-eyjk96r2!b117912'.
+                DATA i_password    TYPE string VALUE 'cc744b1f-5237-4a7e-ab44-858fdd00fb73$3wcTQpYfe1kbmjltnA8zSDb5ogj0TpaYon4WHM-TwfE='.
+
+                DATA(http_destination) = cl_http_destination_provider=>create_by_url(
+                    i_url = i_url
+                ).
+
+                DATA(lo_http_client) = cl_web_http_client_manager=>create_by_http_destination(
+                    i_destination = http_destination
+                ).
+
+                lo_http_client->get_http_request( )->set_authorization_basic(
+                    i_username = i_username
+                    i_password = i_password
+                ).
+
+                lo_http_client->get_http_request( )->set_text(
+                    i_text = request_body " 'Hello, CPI!'
+                ).
+
+                DATA(lo_http_response) = lo_http_client->execute(
+                    i_method   = if_web_http_client=>get
+*                    i_timeout  = 0
+                ).
+
+                DATA(response_body) = lo_http_response->get_text( ).
+                DATA(status)        = lo_http_response->get_status( ).
+                DATA(header_fields) = lo_http_response->get_header_fields( ).
+                DATA(header_status) = lo_http_response->get_header_field( '~status_code' ).
+
+*                out->write( cl_abap_char_utilities=>cr_lf && status-code && cl_abap_char_utilities=>cr_lf ).
+*                out->write( cl_abap_char_utilities=>cr_lf && response_body && cl_abap_char_utilities=>cr_lf ).
+
+                IF ( status-code = 200 ).
+                    APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-success text = 'Successfully Sent.'  ) ) TO reported-shipment.
+                ELSE.
+                    DATA(code) = CONV string( status-code ).
+                    CONCATENATE 'Error Status Code =' code '.' INTO DATA(text) SEPARATED BY space.
+                    APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = text  ) ) TO reported-shipment.
+                    RETURN.
+                ENDIF.
+
+            CATCH /iwbep/cx_cp_remote INTO DATA(lx_remote).
+              " Handle remote Exception
+*              RAISE SHORTDUMP lx_remote.
+                APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'Remote Error.' ) ) TO reported-shipment.
+                RETURN.
+
+            CATCH /iwbep/cx_gateway INTO DATA(lx_gateway).
+              " Handle Exception
+*              RAISE SHORTDUMP lx_gateway.
+                APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'Gateway Error.' ) ) TO reported-shipment.
+                RETURN.
+
+            CATCH cx_web_http_client_error INTO DATA(lx_web_http_client_error).
+              " Handle Exception
+*              RAISE SHORTDUMP lx_web_http_client_error.
+                APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'Web HTTP Client Error.' ) ) TO reported-shipment.
+                RETURN.
+
+            CATCH cx_http_dest_provider_error INTO DATA(lx_http_dest_provider_error).
+                "handle exception
+*              RAISE SHORTDUMP lx_http_dest_provider_error.
+                APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'HTTP Dest Provider Error.' ) ) TO reported-shipment.
+                RETURN.
+
+            ENDTRY.
+
+*           SELECT OutboundDelivery FROM I_OutboundDeliveryTP WHERE ( SoldToParty = @sold_to_party ) INTO TABLE @DATA(lt_outbound_delivery).
+
+            MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+                ENTITY Shipment
+                UPDATE FIELDS ( Released )
+                WITH VALUE #( (
+                    %tky        = <entity>-%tky
+                    Released    = abap_true
+                ) )
+                FAILED DATA(failed2)
+                MAPPED DATA(mapped2)
+                REPORTED DATA(reported2).
+
+        ENDIF.
+
+        IF ( <entity>-%is_draft = '01' ). " Draft
+
+*           Short format message
+            APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'Data not saved.' ) ) TO reported-shipment.
+            RETURN.
+
+**            "MESSAGE" is not allowed in the current ABAP language version.
+*            MESSAGE e001(Z_SHIPMENT_003) WITH 'Test1' <entity>-ShipmentID '' ''.
+
+**           Long format message
+*            DATA(severity)  = if_abap_behv_message=>severity-error.
+*            DATA msgid TYPE sy-msgid VALUE 'Z_SHIPMENT_003'.
+*            DATA msgno TYPE sy-msgno VALUE '001'.
+*            DATA msgv1 TYPE sy-msgv1 VALUE ''.
+*            DATA msgv2 TYPE sy-msgv2 VALUE ''.
+*            DATA msgv3 TYPE sy-msgv3 VALUE ''.
+*            DATA msgv4 TYPE sy-msgv4 VALUE ''.
+*            msgv1 = 'Shipment'.
+*            msgv2 = |{ <entity>-ShipmentID ALPHA = OUT }|.
+*            msgv3 = '- Data not saved.'.
+*            APPEND VALUE #( %key = <entity>-%key %msg = new_message( severity = severity id = msgid number = msgno v1 = msgv1 v2 = msgv2 v3 = msgv3 v4 = msgv4 ) ) TO reported-shipment.
+
+        ENDIF.
+
+    ENDLOOP.
+
+**    Illegal Statement
+*    CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'.
+
+  ENDMETHOD. " release
+
+  METHOD on_create. " on initial create
+
+     " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Shipment
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+        ENDIF.
+        IF ( <entity>-%is_draft = '01' ). " Draft
+        ENDIF.
+
+*       Generate New Matrix ID
+        DATA shipmentid TYPE zi_shipment_003-ShipmentID VALUE '0000000000'.
+        SELECT MAX( shipmentid ) FROM zi_shipment_003 INTO (@shipmentid).
+        shipmentid  = ( shipmentid + 1 ).
+
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment
+            UPDATE FIELDS ( ShipmentID )
+            WITH VALUE #( (
+                %tky        = <entity>-%tky
+                ShipmentID  = shipmentid
+            ) )
+            FAILED DATA(ls_failed1)
+            MAPPED DATA(ls_mapped1)
+            REPORTED DATA(ls_reported1).
+
+    ENDLOOP.
+
+  ENDMETHOD. " on_create
 
 ENDCLASS. " lhc_shipment IMPLEMENTATION
 
