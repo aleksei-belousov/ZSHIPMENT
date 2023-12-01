@@ -1,0 +1,8 @@
+ implementation abstract;
+ define behavior for ZRAP_ZC_SHIPMENT_003
+  etag master ETAG__ETAG
+ {
+  create;
+ update;
+ delete;
+ }

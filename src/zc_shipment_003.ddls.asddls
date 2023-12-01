@@ -15,6 +15,27 @@ define root view entity ZC_SHIPMENT_003 provider contract transactional_query as
     SoldToParty as SoldToParty,
     
     Released,
+    ConfirmationDate,
+
+    Tour,
+    TransportationType, 
+    FreightForwarderClient,
+    
+    @Consumption.valueHelpDefinition: [ { entity: { name: 'I_Customer', element: 'Customer' } } ]
+    @EndUserText.label: 'Party ID'
+    PartyID,
+    
+    OrganisationFormattedName1,
+    OrganisationFormattedName2,
+    OrganisationFormattedName3,
+    OrganisationFormattedName4,
+    StreetName,
+    HouseID,
+    CityName,
+    CountryCode,
+    TaxJurisdictionCode,
+    StreetPostalCode,
+    Instructions, 
 
     CreatedBy,
     CreatedAt,

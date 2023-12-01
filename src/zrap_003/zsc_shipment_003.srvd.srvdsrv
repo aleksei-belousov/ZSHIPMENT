@@ -1,0 +1,8 @@
+@EndUserText.label: 'ZSC_SHIPMENT_003'
+@OData.schema.name: 'cds_zsd_shipment_003'
+define service ZSC_SHIPMENT_003 {
+ expose ZRAP_I_DRAFTADMINIST912358B8E7; 
+ expose ZRAP_ZC_ADDED_003; 
+ expose ZRAP_ZC_AVAILABLE_003; 
+ expose ZRAP_ZC_SHIPMENT_003; 
+ } 

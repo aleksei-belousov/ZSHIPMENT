@@ -64,6 +64,70 @@ annotate entity ZC_SHIPMENT_003 with
             identification: [ { position: 50, label: 'Released' } ] }
     Released;
 
+    @UI: {  lineItem:       [ { position: 60, label: 'Confirmation Date', cssDefault.width: '200px' } ],
+            identification: [ { position: 60, label: 'Confirmation Date' } ] }
+    ConfirmationDate;
+
+    @UI: {  lineItem:       [ { position: 70, label: 'Shipment Group', cssDefault.width: '200px' } ],
+            identification: [ { position: 70, label: 'Shipment Group' } ] }
+    PartyID;
+
+    @UI: {  lineItem:       [ { position: 80, label: 'Tour', cssDefault.width: '200px' } ],
+            identification: [ { position: 80, label: 'Tour' } ] }
+    Tour;
+
+    @UI: {  lineItem:       [ { position: 90, label: 'Transportation Type', cssDefault.width: '200px' } ],
+            identification: [ { position: 90, label: 'Transportation Type' } ] }
+    TransportationType; 
+
+    @UI: {  lineItem:       [ { position: 100, label: 'Freight Forwarder Client', cssDefault.width: '200px' } ],
+            identification: [ { position: 100, label: 'Freight Forwarder Client' } ] }
+    FreightForwarderClient;
+
+    @UI: {  lineItem:       [ { position: 110, label: 'Organisation Formatted Name 1', cssDefault.width: '200px' } ],
+            identification: [ { position: 110, label: 'Organisation Formatted Name 1' } ] }
+    OrganisationFormattedName1;
+
+    @UI: {  lineItem:       [ { position: 120, label: 'Organisation Formatted Name 2', cssDefault.width: '200px' } ],
+            identification: [ { position: 120, label: 'Organisation Formatted Name 2' } ] }
+    OrganisationFormattedName2;
+
+    @UI: {  lineItem:       [ { position: 130, label: 'Organisation Formatted Name 3', cssDefault.width: '200px' } ],
+            identification: [ { position: 130, label: 'Organisation Formatted Name 3' } ] }
+    OrganisationFormattedName3;
+
+    @UI: {  lineItem:       [ { position: 140, label: 'Organisation Formatted Name 4', cssDefault.width: '200px' } ],
+            identification: [ { position: 140, label: 'Organisation Formatted Name 4' } ] }
+    OrganisationFormattedName4;
+
+    @UI: {  lineItem:       [ { position: 150, label: 'Street Name', cssDefault.width: '200px' } ],
+            identification: [ { position: 150, label: 'Street Name' } ] }
+    StreetName;
+
+    @UI: {  lineItem:       [ { position: 160, label: 'House ID', cssDefault.width: '200px' } ],
+            identification: [ { position: 160, label: 'House ID' } ] }
+    HouseID;
+
+    @UI: {  lineItem:       [ { position: 170, label: 'City Name', cssDefault.width: '200px' } ],
+            identification: [ { position: 170, label: 'City Name' } ] }
+    CityName;
+
+    @UI: {  lineItem:       [ { position: 180, label: 'Country Code', cssDefault.width: '200px' } ],
+            identification: [ { position: 180, label: 'Country Code' } ] }
+    CountryCode;
+
+    @UI: {  lineItem:       [ { position: 190, label: 'Tax Jurisdiction Code', cssDefault.width: '200px' } ],
+            identification: [ { position: 190, label: 'Tax Jurisdiction Code' } ] }
+    TaxJurisdictionCode;
+
+    @UI: {  lineItem:       [ { position: 200, label: 'Street Postal Code', cssDefault.width: '200px' } ],
+            identification: [ { position: 200, label: 'Street Postal Code' } ] }
+    StreetPostalCode;
+
+    @UI: {  lineItem:       [ { position: 210, label: 'Instructions', cssDefault.width: '200px' } ],
+            identification: [ { position: 210, label: 'Instructions' } ] }
+    Instructions;
+
     @UI.hidden: true
     CreatedBy;
 

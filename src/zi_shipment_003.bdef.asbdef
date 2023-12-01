@@ -26,6 +26,8 @@ etag master LocalLastChangedAt
 
   // Events:
   determination on_create on modify { field ShipmentUUID; }
+  determination on_save_customer on save { field PartyID; }
+  determination on_modify_customer on modify { field PartyID; }
 
   // Associations:
   association _Added {  create ( features : instance, authorization : update ); with draft; }
@@ -33,12 +35,29 @@ etag master LocalLastChangedAt
 
   field ( readonly, numbering : managed ) ShipmentUUID;
   field ( readonly ) ShipmentID;
-  field ( readonly ) Released;
+//  field ( readonly ) Released;
+//  field ( readonly ) ConfirmationDate;
+//  field ( readonly ) PartyID;
+//  field ( readonly ) Tour;
+//  field ( readonly ) TransportationType;
+//  field ( readonly ) FreightForwarderClient;
+//  field ( readonly ) OrganisationFormattedName1;
+//  field ( readonly ) OrganisationFormattedName2;
+//  field ( readonly ) OrganisationFormattedName3;
+//  field ( readonly ) OrganisationFormattedName4;
+//  field ( readonly ) StreetName;
+//  field ( readonly ) HouseID;
+//  field ( readonly ) CityName;
+//  field ( readonly ) CountryCode;
+//  field ( readonly ) TaxJurisdictionCode;
+//  field ( readonly ) StreetPostalCode;
+//  field ( readonly ) Instructions;
 
   side effects
   {
     action retrieve affects entity _Available;
     action release affects field Released;
+    field PartyID affects $self;
   }
 
 }

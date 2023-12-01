@@ -22,8 +22,33 @@ CLASS lhc_shipment DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
     METHODS release FOR MODIFY
       IMPORTING keys FOR ACTION Shipment~release.
+
     METHODS on_create FOR DETERMINE ON MODIFY
       IMPORTING keys FOR Shipment~on_create.
+
+    METHODS on_save_customer FOR DETERMINE ON SAVE
+      IMPORTING keys FOR Shipment~on_save_customer.
+    METHODS on_modify_customer FOR DETERMINE ON MODIFY
+      IMPORTING keys FOR Shipment~on_modify_customer.
+
+    METHODS get_texts_internal
+      IMPORTING VALUE(i_customer)               TYPE string
+                VALUE(i_sales_organization)     TYPE string
+                VALUE(i_distribution_channel)   TYPE string
+                VALUE(i_division)               TYPE string
+                VALUE(i_language)               TYPE string
+                VALUE(i_long_text_id)           TYPE string
+      RETURNING VALUE(o_text)                   TYPE string.
+
+    METHODS get_address_internal
+      IMPORTING VALUE(i_customer)               TYPE string
+      EXPORTING VALUE(o_street_name)            TYPE string
+                VALUE(o_house_number)           TYPE string.
+
+    METHODS get_forwarding_rule_internal
+      IMPORTING VALUE(i_forwarding_rule_id)             TYPE string
+      EXPORTING VALUE(o_transportation_type_shipment)   TYPE string
+                VALUE(o_freight_forwarder_client)       TYPE string.
 
 ENDCLASS. " lhc_shipment DEFINITION
 
@@ -36,7 +61,7 @@ CLASS lhc_shipment IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD Activate.
-  ENDMETHOD.
+  ENDMETHOD. " Activate
 
   METHOD Edit.
   ENDMETHOD.
@@ -85,37 +110,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                 REPORTED DATA(reported2).
         ENDLOOP.
 
-*       Read Outbound Delivery by Sold To Party:
-*        DATA(sold_to_party) = |{ <entity>-SoldToParty ALPHA = IN }|. " '0010100014'
-
-*       Read Outbound Delivery (via SQL)
-*        SELECT OutboundDelivery FROM I_OutboundDeliveryTP WHERE ( SoldToParty = @sold_to_party ) INTO TABLE @DATA(lt_outbound_delivery).
-
-
-*       Read Outbound Delivery by Collective Processing:
-*        DATA(collective_processing) = |{ <entity>-CollectiveProcessing ALPHA = IN }|. " '1'
         DATA(collective_processing) = <entity>-CollectiveProcessing. " '1'
-
-*       Read Collective Processing (header)
-*        SELECT SINGLE * FROM I_CollectiveProcessing WHERE ( CollectiveProcessing = @collective_processing ) INTO @DATA(ls_collective_processing).
-
-*       Read Collective Processing Document (items) (via SQL)
-*       The use of CDS Entity I_COLLECTIVEPROCESSINGDOCUMENT is not permitted.
-*       The use of CDS Entity I_COLLECTIVEPROCESSINGDOCUMENT is not permitted.
-*       The use of element COLLECTIVEPROCESSING of CDS Entity I_COLLECTIVEPROCESSINGDOCUMENT is not permitted.
-*        SELECT * FROM I_CollectiveProcessing\_CollectiveProcessingDocument as CollectiveProcessingDocument WHERE ( CollectiveProcessingDocument~CollectiveProcessing = @collective_processing ) INTO TABLE @DATA(lt_document).
-
-*       There is no behavior definition for "I_COLLECTIVEPROCESSING".
-*       Read Collective Processing Document (items) (via CDS)
-*        READ ENTITIES OF I_CollectiveProcessing
-*            ENTITY CollectiveProcessing
-*            ALL FIELDS WITH VALUE #( ( CollectiveProcessing = collective_processing ) )
-*            RESULT DATA(lt_outbound_delivery)
-*            FAILED DATA(failed)
-*            REPORTED DATA(reported).
-
-*       Read Outbound Delivery (via SQL)
-*        SELECT OutboundDelivery FROM I_OutboundDeliveryTP WHERE ( SoldToParty = @sold_to_party ) INTO TABLE @DATA(lt_outbound_delivery).
 
 *       Read Collective Processing (header) (via SQL)
         SELECT SINGLE * FROM zi_vbsk_003 WHERE ( CollectiveProcessing = @collective_processing ) INTO @DATA(ls_collective_processing).
@@ -201,14 +196,25 @@ CLASS lhc_shipment IMPLEMENTATION.
 
             DATA request_body TYPE string VALUE ''.
 
-*           Make body as a CSV
-*            LOOP AT lt_available INTO DATA(ls_available).
-*                 request_body = request_body && ls_available-OutboundDelivery && cl_abap_char_utilities=>cr_lf.
-*            ENDLOOP.
-
 *           Make body as an XML
             request_body = request_body && '<ShipmentBinding>' && cl_abap_char_utilities=>cr_lf.
             request_body = request_body && '<ID>' && <entity>-ShipmentID && '</ID>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<ConfirmationDate>' && <entity>-ConfirmationDate && '</ConfirmationDate>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<Tour>' && <entity>-Tour && '</Tour>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<TransportationType>' && <entity>-TransportationType && '</TransportationType>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<FreightForwarderClient>' && <entity>-FreightForwarderClient && '</FreightForwarderClient>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<PartyID>' && <entity>-PartyID && '</PartyID>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<OrganisationFormattedName1>' && <entity>-OrganisationFormattedName1 && '</OrganisationFormattedName1>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<OrganisationFormattedName2>' && <entity>-OrganisationFormattedName2 && '</OrganisationFormattedName2>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<OrganisationFormattedName3>' && <entity>-OrganisationFormattedName3 && '</OrganisationFormattedName3>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<OrganisationFormattedName4>' && <entity>-OrganisationFormattedName4 && '</OrganisationFormattedName4>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<StreetName>' && <entity>-StreetName && '</StreetName>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<HouseID>' && <entity>-HouseID && '</HouseID>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<CityName>' && <entity>-CityName && '</CityName>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<CountryCode>' && <entity>-CountryCode && '</CountryCode>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<TaxJurisdictionCode>' && <entity>-TaxJurisdictionCode && '</TaxJurisdictionCode>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<StreetPostalCode>' && <entity>-StreetPostalCode && '</StreetPostalCode>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<Instructions>' && <entity>-Instructions && '</Instructions>' && cl_abap_char_utilities=>cr_lf.
             LOOP AT lt_available INTO DATA(ls_available).
                 request_body = request_body && '<OutboundDelivery>' && cl_abap_char_utilities=>cr_lf.
                 request_body = request_body && '<ID>' && ls_available-OutboundDelivery && '</ID>' && cl_abap_char_utilities=>cr_lf.
@@ -369,6 +375,347 @@ CLASS lhc_shipment IMPLEMENTATION.
     ENDLOOP.
 
   ENDMETHOD. " on_create
+
+  METHOD on_save_customer.
+  ENDMETHOD. " on_save_customer
+
+  METHOD on_modify_customer.
+
+     " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Shipment
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+        ENDIF.
+        IF ( <entity>-%is_draft = '01' ). " Draft
+        ENDIF.
+
+        DATA(partyID) = |{ <entity>-PartyID ALPHA = IN }|.
+
+        " Read transfered instances
+        SELECT SINGLE * FROM I_Customer WHERE ( Customer = @partyID ) INTO @DATA(ls_customer).
+
+        IF ( sy-subrc = 0 ).
+
+            DATA(tx03) = get_texts_internal(
+                EXPORTING
+                    i_customer             = CONV string( ls_customer-Customer )
+                    i_sales_organization   = '1000'
+                    i_distribution_channel = '10'
+                    i_division             = '00'
+                    i_language             = 'EN'
+                    i_long_text_id         = 'TX03'
+            ).
+
+            DATA(zfw1) = get_texts_internal(
+                EXPORTING
+                    i_customer             = CONV string( ls_customer-Customer )
+                    i_sales_organization   = '1000'
+                    i_distribution_channel = '10'
+                    i_division             = '00'
+                    i_language             = 'EN'
+                    i_long_text_id         = 'ZFW1'
+            ).
+
+            DATA(zlvs) = get_texts_internal(
+                EXPORTING
+                    i_customer             = CONV string( ls_customer-Customer )
+                    i_sales_organization   = '1000'
+                    i_distribution_channel = '10'
+                    i_division             = '00'
+                    i_language             = 'EN'
+                    i_long_text_id         = 'ZLVS'
+            ).
+
+            get_forwarding_rule_internal(
+              EXPORTING
+                i_forwarding_rule_id           = zfw1
+              IMPORTING
+                o_transportation_type_shipment = DATA(transportationTypeShipment)
+                o_freight_forwarder_client     = DATA(freightForwarderClient)
+            ).
+
+            get_address_internal(
+              EXPORTING
+                i_customer     = CONV string( ls_customer-Customer )
+              IMPORTING
+                o_street_name  = DATA(streetName)
+                o_house_number = DATA(houseNumber)
+            ).
+
+        ENDIF.
+
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment
+            UPDATE FIELDS (
+                CityName
+                CountryCode
+                HouseID
+                OrganisationFormattedName1
+                OrganisationFormattedName2
+                OrganisationFormattedName3
+                OrganisationFormattedName4
+                StreetName
+                StreetPostalCode
+                TaxJurisdictionCode
+                Tour
+                TransportationType
+                FreightForwarderClient
+                Instructions
+            )
+            WITH VALUE #( (
+                %is_draft                   = <entity>-%is_draft
+                %key                        = <entity>-%key
+                CityName                    = ls_customer-CityName
+                CountryCode                 = ls_customer-Country
+                HouseID                     = houseNumber
+                OrganisationFormattedName1  = ls_customer-BusinessPartnerName1
+                OrganisationFormattedName2  = ls_customer-BusinessPartnerName2
+                OrganisationFormattedName3  = ls_customer-BusinessPartnerName3
+                OrganisationFormattedName4  = ls_customer-BusinessPartnerName4
+                StreetName                  = streetName
+                StreetPostalCode            = ls_customer-PostalCode
+                TaxJurisdictionCode         = ls_customer-TaxJurisdiction
+                Tour                        = zlvs
+                TransportationType          = transportationTypeShipment
+                FreightForwarderClient      = freightForwarderClient
+                Instructions                = tx03
+            ) )
+            MAPPED DATA(mapped1)
+            FAILED DATA(failed1)
+            REPORTED DATA(reported1).
+
+
+    ENDLOOP.
+
+  ENDMETHOD. " on_modify_customer
+
+  METHOD get_texts_internal.
+
+    TRY.
+
+*  DATA(i_url) = 'https://my404898-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_CustomerSalesAreaText(Customer=''10001722'',SalesOrganization=''1000'',DistributionChannel=''10'',Division=''00'',Language=''EN'',LongTextID=''ZLVS'')'.
+        DATA(system_url)    = cl_abap_context_info=>get_system_url( ).
+        DATA(customer)      = '''' && i_customer && ''','.
+        DATA(long_text_id)  = '''' && i_long_text_id && ''')'.
+        CONCATENATE
+                'https://'
+                system_url(8) " my404898
+                '-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_CustomerSalesAreaText('
+                'Customer='
+                customer " '''10001722'','
+                'SalesOrganization='
+                '''1000'','
+                'DistributionChannel='
+                '''10'','
+                'Division='
+                '''00'','
+                'Language='
+                '''EN'','
+                'LongTextID='
+                long_text_id " '''ZLVS'')'
+            INTO DATA(i_url).
+        DATA i_username TYPE string VALUE 'INBOUND_USER'.
+        DATA i_password TYPE string VALUE 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
+
+        DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url = i_url ).
+
+        DATA(lo_http_client) = cl_web_http_client_manager=>create_by_http_destination( http_destination ).
+
+        lo_http_client->get_http_request( )->set_authorization_basic(
+            i_username = i_username
+            i_password = i_password
+        ).
+
+        DATA(lo_http_response) = lo_http_client->execute(
+            i_method   = if_web_http_client=>get
+        ).
+
+        DATA(text) = lo_http_response->get_text( ).
+
+        DATA(status) = lo_http_response->get_status( ).
+
+        REPLACE '<d:LongText>'  WITH '******' INTO text.
+        REPLACE '</d:LongText>' WITH '******' INTO text.
+        SPLIT text AT '******' INTO DATA(s1) DATA(s2) DATA(s3).
+
+        o_text = s2.
+
+    CATCH cx_abap_context_info_error INTO DATA(lx_abap_context_info_error).
+      " Handle remote Exception
+*      RAISE SHORTDUMP lx_abap_context_info_error.
+
+    CATCH /iwbep/cx_cp_remote INTO DATA(lx_remote).
+      " Handle remote Exception
+*      RAISE SHORTDUMP lx_remote.
+
+    CATCH /iwbep/cx_gateway INTO DATA(lx_gateway).
+      " Handle Exception
+*      RAISE SHORTDUMP lx_gateway.
+
+    CATCH cx_web_http_client_error INTO DATA(lx_web_http_client_error).
+      " Handle Exception
+*      RAISE SHORTDUMP lx_web_http_client_error.
+
+    CATCH cx_http_dest_provider_error INTO DATA(lx_http_dest_provider_error).
+        "handle exception
+*      RAISE SHORTDUMP lx_http_dest_provider_error.
+
+    ENDTRY.
+
+  ENDMETHOD. " get_texts_internal
+
+  METHOD get_address_internal.
+
+    TRY.
+
+*  DATA(i_url) = 'https://my404898-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='10001722',AddressID='7927')'.
+*  DATA(i_url) = 'https://my404898-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner(BusinessPartner='10001722')/to_BusinessPartnerAddress'.
+        DATA(system_url)    = cl_abap_context_info=>get_system_url( ).
+        DATA(customer)      = '''' && i_customer && ''')'.
+        CONCATENATE
+                'https://'
+                system_url(8) " my404898
+                '-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner('
+                'BusinessPartner='
+                customer " '''10001722'','
+                '/to_BusinessPartnerAddress'
+            INTO DATA(i_url).
+        DATA i_username TYPE string VALUE 'INBOUND_USER'.
+        DATA i_password TYPE string VALUE 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
+
+        DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url = i_url ).
+
+        DATA(lo_http_client) = cl_web_http_client_manager=>create_by_http_destination( http_destination ).
+
+        lo_http_client->get_http_request( )->set_authorization_basic(
+            i_username = i_username
+            i_password = i_password
+        ).
+
+        DATA(lo_http_response) = lo_http_client->execute(
+            i_method   = if_web_http_client=>get
+        ).
+
+        DATA(text) = lo_http_response->get_text( ).
+
+        DATA(status) = lo_http_response->get_status( ).
+
+        REPLACE '<d:StreetName>'        IN text WITH '******'.
+        REPLACE '</d:StreetName>'       IN text WITH '******'.
+        REPLACE '<d:HouseNumber>'       IN text WITH '******'.
+        REPLACE '</d:HouseNumber>'      IN text WITH '******'.
+        SPLIT text AT '******' INTO DATA(s1) DATA(s2) DATA(s3) DATA(s4) DATA(s5).
+
+        o_house_number  = s2.
+        o_street_name   = s4.
+
+    CATCH cx_abap_context_info_error INTO DATA(lx_abap_context_info_error).
+      " Handle remote Exception
+*      RAISE SHORTDUMP lx_abap_context_info_error.
+
+    CATCH /iwbep/cx_cp_remote INTO DATA(lx_remote).
+      " Handle remote Exception
+*      RAISE SHORTDUMP lx_remote.
+
+    CATCH /iwbep/cx_gateway INTO DATA(lx_gateway).
+      " Handle Exception
+*      RAISE SHORTDUMP lx_gateway.
+
+    CATCH cx_web_http_client_error INTO DATA(lx_web_http_client_error).
+      " Handle Exception
+*      RAISE SHORTDUMP lx_web_http_client_error.
+
+    CATCH cx_http_dest_provider_error INTO DATA(lx_http_dest_provider_error).
+        "handle exception
+*      RAISE SHORTDUMP lx_http_dest_provider_error.
+
+    ENDTRY.
+
+  ENDMETHOD. " get_address_internal
+
+  METHOD get_forwarding_rule_internal.
+
+    TRY.
+
+*  DATA(i_url) = 'https://my404898.s4hana.cloud.sap/sap/opu/odata/sap/YY1_FORWARDINGRULE_CDS/YY1_FORWARDINGRULE?$filter=ForwardingRuleID eq '262_NEUTRAL KARSTADT'&$select=TransportationTypeShipment,FreightForwarderClient'.
+        DATA(system_url)    = cl_abap_context_info=>get_system_url( ).
+        DATA(forwarding_rule_id)  = '''' && i_forwarding_rule_id && ''''.
+        CONCATENATE
+                'https://'
+                system_url(8) " my404898
+                '-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_FORWARDINGRULE_CDS/YY1_FORWARDINGRULE'
+*                '?$filter=ForwardingRuleID eq'
+*                forwarding_rule_id " '''262_NEUTRAL KARSTADT'''
+*                '&$select=TransportationTypeShipment,FreightForwarderClient'
+            INTO DATA(i_url).
+        DATA i_username TYPE string VALUE 'INBOUND_USER'.
+        DATA i_password TYPE string VALUE 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
+
+        DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url = i_url ).
+
+        DATA(lo_http_client) = cl_web_http_client_manager=>create_by_http_destination( http_destination ).
+
+        lo_http_client->get_http_request( )->set_authorization_basic(
+            i_username = i_username
+            i_password = i_password
+        ).
+
+        DATA(lo_http_request) = lo_http_client->get_http_request( ).
+
+        CONCATENATE
+                '$filter=ForwardingRuleID eq'
+                forwarding_rule_id " '''262_NEUTRAL KARSTADT'''
+                '&$select=TransportationTypeShipment,FreightForwarderClient'
+            INTO
+                DATA(query).
+        lo_http_request->set_query( query = query ).
+
+        DATA(lo_http_response) = lo_http_client->execute(
+            i_method   = if_web_http_client=>get
+        ).
+
+        DATA(text) = lo_http_response->get_text( ).
+
+        DATA(status) = lo_http_response->get_status( ).
+
+        REPLACE '<d:TransportationTypeShipment>'    IN text WITH '******'.
+        REPLACE '</d:TransportationTypeShipment>'   IN text WITH '******'.
+        REPLACE '<d:FreightForwarderClient>'        IN text WITH '******'.
+        REPLACE '</d:FreightForwarderClient>'       IN text WITH '******'.
+        SPLIT text AT '******' INTO DATA(s1) DATA(s2) DATA(s3) DATA(s4) DATA(s5).
+
+        o_transportation_type_shipment  = s2.
+        o_freight_forwarder_client      = s4.
+
+    CATCH cx_abap_context_info_error INTO DATA(lx_abap_context_info_error).
+      " Handle remote Exception
+*      RAISE SHORTDUMP lx_abap_context_info_error.
+
+    CATCH /iwbep/cx_cp_remote INTO DATA(lx_remote).
+      " Handle remote Exception
+*      RAISE SHORTDUMP lx_remote.
+
+    CATCH /iwbep/cx_gateway INTO DATA(lx_gateway).
+      " Handle Exception
+*      RAISE SHORTDUMP lx_gateway.
+
+    CATCH cx_web_http_client_error INTO DATA(lx_web_http_client_error).
+      " Handle Exception
+*      RAISE SHORTDUMP lx_web_http_client_error.
+
+    CATCH cx_http_dest_provider_error INTO DATA(lx_http_dest_provider_error).
+        "handle exception
+*      RAISE SHORTDUMP lx_http_dest_provider_error.
+
+    ENDTRY.
+
+  ENDMETHOD. " get_forwarding_rule_internal
 
 ENDCLASS. " lhc_shipment IMPLEMENTATION
 
