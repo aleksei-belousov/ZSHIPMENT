@@ -1,7 +1,0 @@
- implementation abstract;
- define behavior for ZRAP_ZC_AVAILABLE_003
-  etag master ETAG__ETAG
- {
-  update;
- delete;
- }
