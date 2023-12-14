@@ -1,6 +1,7 @@
 @EndUserText.label: 'Collective Processing'
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @Metadata.allowExtensions: true
+
 define root view entity ZC_VBSK_003 provider contract transactional_query as projection on ZI_VBSK_003 as CollectiveProcessing 
 {
     key ZvbskUUID,

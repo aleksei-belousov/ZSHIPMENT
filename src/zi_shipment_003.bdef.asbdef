@@ -23,6 +23,7 @@ etag master LocalLastChangedAt
   // Actions:
   action retrieve;
   action release;
+  action create_tariff_document;
 
   // Events:
   determination on_create on modify { field ShipmentUUID; }

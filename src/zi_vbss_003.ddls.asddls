@@ -1,5 +1,6 @@
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @EndUserText.label: 'Collective Processing Document'
+
 define view entity ZI_VBSS_003 as select from zvbss003 as CollectiveProcessingDocument
 association to parent ZI_VBSK_003 as _CollectiveProcessing on $projection.ZvbskUUID = _CollectiveProcessing.ZvbskUUID
 {

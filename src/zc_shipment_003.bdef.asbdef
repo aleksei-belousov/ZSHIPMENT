@@ -17,9 +17,10 @@ define behavior for ZC_SHIPMENT_003 alias Shipment
 
   use action retrieve;
   use action release;
+  use action create_tariff_document;
 
-  use association _Added { /*create;*/ with draft;}
   use association _Available { create; with draft;}
+//  use association _Added { /*create;*/ with draft;}
 }
 
 define behavior for ZC_AVAILABLE_003 alias Available
@@ -30,10 +31,10 @@ define behavior for ZC_AVAILABLE_003 alias Available
   use association _Shipment { with draft; }
 }
 
-define behavior for ZC_ADDED_003 alias Added
-{
-  use update;
-//  use delete;
-
-  use association _Shipment { with draft; }
-}
+//define behavior for ZC_ADDED_003 alias Added
+//{
+//  use update;
+////  use delete;
+//
+//  use association _Shipment { with draft; }
+//}

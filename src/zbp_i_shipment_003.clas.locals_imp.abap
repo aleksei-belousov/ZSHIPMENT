@@ -30,6 +30,8 @@ CLASS lhc_shipment DEFINITION INHERITING FROM cl_abap_behavior_handler.
       IMPORTING keys FOR Shipment~on_save_customer.
     METHODS on_modify_customer FOR DETERMINE ON MODIFY
       IMPORTING keys FOR Shipment~on_modify_customer.
+    METHODS create_tariff_document FOR MODIFY
+      IMPORTING keys FOR ACTION Shipment~create_tariff_document.
 
     METHODS get_texts_internal
       IMPORTING VALUE(i_customer)               TYPE string
@@ -61,6 +63,44 @@ CLASS lhc_shipment IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD Activate.
+
+
+     " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Shipment
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+        ENDIF.
+        IF ( <entity>-%is_draft = '01' ). " Draft
+        ENDIF.
+
+*       Generate and Set New Matrix ID
+        IF ( <entity>-ShipmentID IS INITIAL ).
+
+            DATA shipmentid TYPE zi_shipment_003-ShipmentID VALUE '0000000000'.
+            SELECT MAX( shipmentid ) FROM zi_shipment_003 INTO (@shipmentid).
+            shipmentid  = ( shipmentid + 1 ).
+
+            MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+                ENTITY Shipment
+                UPDATE FIELDS ( ShipmentID )
+                WITH VALUE #( (
+                    %tky        = <entity>-%tky
+                    ShipmentID  = shipmentid
+                ) )
+                FAILED DATA(ls_failed1)
+                MAPPED DATA(ls_mapped1)
+                REPORTED DATA(ls_reported1).
+
+         ENDIF.
+
+    ENDLOOP.
+
   ENDMETHOD. " Activate
 
   METHOD Edit.
@@ -340,9 +380,9 @@ CLASS lhc_shipment IMPLEMENTATION.
 
   ENDMETHOD. " release
 
-  METHOD on_create. " on initial create
+  METHOD create_tariff_document.
 
-     " Read transfered instances
+    " Read transfered instances
     READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
         ENTITY Shipment
         ALL FIELDS
@@ -356,23 +396,43 @@ CLASS lhc_shipment IMPLEMENTATION.
         IF ( <entity>-%is_draft = '01' ). " Draft
         ENDIF.
 
-*       Generate New Matrix ID
-        DATA shipmentid TYPE zi_shipment_003-ShipmentID VALUE '0000000000'.
-        SELECT MAX( shipmentid ) FROM zi_shipment_003 INTO (@shipmentid).
-        shipmentid  = ( shipmentid + 1 ).
-
-        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
-            ENTITY Shipment
-            UPDATE FIELDS ( ShipmentID )
-            WITH VALUE #( (
-                %tky        = <entity>-%tky
-                ShipmentID  = shipmentid
-            ) )
-            FAILED DATA(ls_failed1)
-            MAPPED DATA(ls_mapped1)
-            REPORTED DATA(ls_reported1).
-
     ENDLOOP.
+
+  ENDMETHOD. " create_tariff_document
+
+  METHOD on_create. " on initial create
+
+*     " Read transfered instances
+*    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+*        ENTITY Shipment
+*        ALL FIELDS
+*        WITH CORRESPONDING #( keys )
+*        RESULT DATA(entities).
+*
+*    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+*
+*        IF ( <entity>-%is_draft = '00' ). " Saved
+*        ENDIF.
+*        IF ( <entity>-%is_draft = '01' ). " Draft
+*        ENDIF.
+*
+**       Generate New Matrix ID (moved to Activate (Save) )
+*        DATA shipmentid TYPE zi_shipment_003-ShipmentID VALUE '0000000000'.
+*        SELECT MAX( shipmentid ) FROM zi_shipment_003 INTO (@shipmentid).
+*        shipmentid  = ( shipmentid + 1 ).
+*
+*        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+*            ENTITY Shipment
+*            UPDATE FIELDS ( ShipmentID )
+*            WITH VALUE #( (
+*                %tky        = <entity>-%tky
+*                ShipmentID  = shipmentid
+*            ) )
+*            FAILED DATA(ls_failed1)
+*            MAPPED DATA(ls_mapped1)
+*            REPORTED DATA(ls_reported1).
+*
+*    ENDLOOP.
 
   ENDMETHOD. " on_create
 
@@ -497,6 +557,8 @@ CLASS lhc_shipment IMPLEMENTATION.
 
   METHOD get_texts_internal.
 
+* https://my404907.s4hana.cloud.sap/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_CustomerSalesAreaText(Customer='GKK',SalesOrganization='1000',DistributionChannel='10',Division='00',Language='EN',LongTextID='ZFW1')
+
     TRY.
 
 *  DATA(i_url) = 'https://my404898-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_CustomerSalesAreaText(Customer=''10001722'',SalesOrganization=''1000'',DistributionChannel=''10'',Division=''00'',Language=''EN'',LongTextID=''ZLVS'')'.
@@ -520,8 +582,13 @@ CLASS lhc_shipment IMPLEMENTATION.
                 'LongTextID='
                 long_text_id " '''ZLVS'')'
             INTO DATA(i_url).
+
         DATA i_username TYPE string VALUE 'INBOUND_USER'.
         DATA i_password TYPE string VALUE 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
+*        IF ( system_url(8) = 'my404907' ). " test
+*            i_username = 'INBOUND_FIEGE_USER'.
+*            i_password = 'JpLftkzhkoktLzvvoxD6oWeXsM#ZXccgfsBBzRpg'.
+*        ENDIF.
 
         DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url = i_url ).
 
@@ -586,8 +653,13 @@ CLASS lhc_shipment IMPLEMENTATION.
                 customer " '''10001722'','
                 '/to_BusinessPartnerAddress'
             INTO DATA(i_url).
+
         DATA i_username TYPE string VALUE 'INBOUND_USER'.
         DATA i_password TYPE string VALUE 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
+*        IF ( system_url(8) = 'my404907' ). " test
+*            i_username = 'INBOUND_FIEGE_USER'.
+*            i_password = 'JpLftkzhkoktLzvvoxD6oWeXsM#ZXccgfsBBzRpg'.
+*        ENDIF.
 
         DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url = i_url ).
 
@@ -654,8 +726,13 @@ CLASS lhc_shipment IMPLEMENTATION.
 *                forwarding_rule_id " '''262_NEUTRAL KARSTADT'''
 *                '&$select=TransportationTypeShipment,FreightForwarderClient'
             INTO DATA(i_url).
+
         DATA i_username TYPE string VALUE 'INBOUND_USER'.
         DATA i_password TYPE string VALUE 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
+        IF ( system_url(8) = 'my404907' ). " test
+            i_username = 'INBOUND_FIEGE_USER'.
+            i_password = 'JpLftkzhkoktLzvvoxD6oWeXsM#ZXccgfsBBzRpg'.
+        ENDIF.
 
         DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url = i_url ).
 

@@ -1,6 +1,7 @@
 @EndUserText.label: 'Shipment'
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @Metadata.allowExtensions: true
+
 define root view entity ZC_SHIPMENT_003 provider contract transactional_query as projection on ZI_SHIPMENT_003 as Shipment
 {
     key ShipmentUUID,

@@ -1,6 +1,7 @@
 @EndUserText.label: 'Collective Processing Document'
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @Metadata.allowExtensions: true
+
 define view entity ZC_VBSS_003 as projection on ZI_VBSS_003 as CollectiveProcessingDocument
 {
     key ZvbssUUID,

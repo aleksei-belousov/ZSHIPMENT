@@ -1,0 +1,94 @@
+@Metadata.layer: #CORE
+@UI: { headerInfo: {
+typeName: 'Repositiory',
+typeNamePlural: 'Repositiory',
+title: { type: #STANDARD, value: 'Comments' },
+         description: { type: #STANDARD, value: 'Comments' } },
+         presentationVariant: [{
+         sortOrder: [{ by: 'ZreporitoryUUID', direction: #ASC }],
+         visualizations: [{type: #AS_LINEITEM}] }] }
+annotate entity ZC_REPORITORY_004 with 
+{
+
+  @UI.facet: [
+    {
+        label:    'General Information',
+        id:       'GeneralInfo',
+        type:     #COLLECTION,
+        position: 10 },
+    {
+        id:       'Repositorydet',
+        purpose:  #STANDARD,
+        type:     #IDENTIFICATION_REFERENCE,
+        label:    'Repository Details',
+        parentId: 'GeneralInfo',
+        position: 10 },
+    {
+        id:       'Upload',
+        purpose:  #STANDARD,
+        type:     #FIELDGROUP_REFERENCE,
+        parentId: 'GeneralInfo',
+        label:    'Upload XDP',
+        position: 20,
+        targetQualifier: 'Upload'
+    } ]
+
+    @UI: { lineItem:       [ { position: 10, importance: #HIGH , label: 'UUID'} ],
+           identification: [ { position: 10, label: 'UUID' },
+                             { type: #FOR_ACTION, dataAction: 'make_pdf',  label: 'Make PDF',  position: 1 } ] }
+    ZreporitoryUUID;
+
+    @UI: { lineItem:       [ { position: 20, importance: #HIGH , label: 'Comments'} ],
+           identification: [ { position: 20, label: 'Comments' } ] }
+    Comments;
+
+    @UI: { lineItem:       [ { position: 50, importance: #HIGH , label: 'Attachment'} ],
+           /*identification: [ { position: 50, label: 'Attachment' } ]*/
+           fieldGroup:     [ { position: 50, qualifier: 'Upload' , label: 'Attachment'} ] }
+    @UI.hidden: true
+    Attachment;
+
+    @UI.hidden: true
+    MimeType;
+
+    @UI.hidden: true
+    FileName;
+
+    @UI: { lineItem:       [ { position: 60, importance: #HIGH , label: 'Attachment XDP'} ],
+           /*identification: [ { position: 60, label: 'Attachment XDP' } ]*/
+           fieldGroup:     [ { position: 60, qualifier: 'Upload' , label: 'Attachment XDP'} ] }
+    XDP;
+
+    @UI.hidden: true
+    MimeType1;
+
+    @UI.hidden: true
+    FileName1;
+
+    @UI: { lineItem:       [ { position: 70, importance: #HIGH , label: 'Attachment PDF'} ],
+           /*identification: [ { position: 70, label: 'Attachment PDF' } ]*/
+           fieldGroup:     [ { position: 70, qualifier: 'Upload' , label: 'Attachment PDF'} ] }
+    PDF;
+
+    @UI.hidden: true
+    MimeType2;
+
+    @UI.hidden: true
+    FileName2;
+
+    @UI.hidden: true
+    CreatedBy;
+
+    @UI.hidden: true
+    CreatedAt;
+
+    @UI.hidden: true
+    LastChangedBy;
+
+    @UI.hidden: true
+    LastChangedAt;
+
+    @UI.hidden: true
+    LocalLastChangedAt;
+    
+}

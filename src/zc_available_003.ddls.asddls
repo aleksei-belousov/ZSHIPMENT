@@ -1,6 +1,7 @@
 @EndUserText.label: 'Available'
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @Metadata.allowExtensions: true
+
 define view entity ZC_AVAILABLE_003 as projection on ZI_AVAILABLE_003 as Available
 {
     key AvailableUUID,

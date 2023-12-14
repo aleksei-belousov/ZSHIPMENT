@@ -1,0 +1,40 @@
+managed implementation in class zbp_i_reporitory_004 unique;
+strict ( 2 );
+with draft;
+
+define behavior for ZI_REPORITORY_004 alias Repository
+persistent table zreporitory004
+draft table zreporitory004d
+lock master
+total etag LocalLastChangedAt
+authorization master ( instance )
+etag master LastChangedAt
+{
+
+  field ( readonly, numbering : managed ) ZreporitoryUUID;
+
+  // administrative fields: read only
+  field ( readonly ) LastChangedAt, LastChangedBy, LocalLastChangedAt, CreatedBy, CreatedAt;
+
+  create;
+  update;
+  delete;
+
+  draft action Edit;
+  draft action Activate optimized;
+  draft action Discard;
+  draft action Resume;
+
+  draft determine action Prepare;
+
+  // Actions:
+  action make_pdf;
+
+  // Events:
+  determination on_create on modify { create; }
+
+  side effects {
+    action make_pdf affects field pdf;
+  }
+
+}

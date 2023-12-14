@@ -10,7 +10,9 @@ CLASS zcl_shipment_003 DEFINITION PUBLIC FINAL CREATE PUBLIC .
 
     METHODS http_call               importing out type ref to if_oo_adt_classrun_out.
     METHODS pdf_test                importing out type ref to if_oo_adt_classrun_out.
-    METHODS business_object_access  importing out type ref to if_oo_adt_classrun_out.
+    METHODS business_object_access  importing out type ref to if_oo_adt_classrun_out
+                                    RAISING
+                                      cx_abap_context_info_error.
 
 ENDCLASS.
 
@@ -19,7 +21,16 @@ CLASS zcl_shipment_003 IMPLEMENTATION.
   METHOD if_oo_adt_classrun~main.
 
 *    http_call( out ).
-    business_object_access( out ).
+
+
+    TRY.
+        business_object_access( out ).
+
+      CATCH cx_abap_context_info_error.
+        "handle exception
+
+    ENDTRY.
+
   ENDMETHOD. " if_oo_adt_classrun~main
 
   METHOD http_call.
@@ -60,6 +71,9 @@ CLASS zcl_shipment_003 IMPLEMENTATION.
             out->write( cl_abap_char_utilities=>cr_lf ).
             out->write( header_field ).
         ENDLOOP.
+
+    CATCH CX_ABAP_CONTEXT_INFO_ERROR.
+      " Handle ABAP_CONTEXT_INFO_ERROR
 
     CATCH /iwbep/cx_cp_remote INTO DATA(lx_remote).
       " Handle remote Exception
@@ -116,6 +130,12 @@ CLASS zcl_shipment_003 IMPLEMENTATION.
         i_username  = 'INBOUND_USER'.
         i_password  = 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
 
+        DATA(system_url) = cl_abap_context_info=>get_system_url( ).
+        IF ( system_url(8) = 'my404907' ). " test
+            i_username = 'INBOUND_FIEGE_USER'.
+            i_password = 'JpLftkzhkoktLzvvoxD6oWeXsM#ZXccgfsBBzRpg'.
+        ENDIF.
+
         DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url ).
 
         DATA(lo_http_client) = cl_web_http_client_manager=>create_by_http_destination( http_destination ).
@@ -152,6 +172,9 @@ CLASS zcl_shipment_003 IMPLEMENTATION.
     CATCH cx_http_dest_provider_error INTO DATA(lx_http_dest_provider_error).
         "handle exception
 *      RAISE SHORTDUMP lx_http_dest_provider_error.
+
+    CATCH cx_abap_context_info_error INTO DATA(lx_abap_context_info_error).
+        "handle exception
 
     ENDTRY.
 
