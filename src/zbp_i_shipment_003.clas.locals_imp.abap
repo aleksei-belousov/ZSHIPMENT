@@ -256,8 +256,9 @@ CLASS lhc_shipment IMPLEMENTATION.
             request_body = request_body && '<StreetPostalCode>' && <entity>-StreetPostalCode && '</StreetPostalCode>' && cl_abap_char_utilities=>cr_lf.
             request_body = request_body && '<Instructions>' && <entity>-Instructions && '</Instructions>' && cl_abap_char_utilities=>cr_lf.
             LOOP AT lt_available INTO DATA(ls_available).
+                DATA(outboundDelivery) = |{ ls_available-OutboundDelivery ALPHA = IN }|.
                 request_body = request_body && '<OutboundDelivery>' && cl_abap_char_utilities=>cr_lf.
-                request_body = request_body && '<ID>' && ls_available-OutboundDelivery && '</ID>' && cl_abap_char_utilities=>cr_lf.
+                request_body = request_body && '<ID>' && outboundDelivery && '</ID>' && cl_abap_char_utilities=>cr_lf.
                 request_body = request_body && '</OutboundDelivery>' && cl_abap_char_utilities=>cr_lf.
             ENDLOOP.
             request_body = request_body && '</ShipmentBinding>' && cl_abap_char_utilities=>cr_lf.
