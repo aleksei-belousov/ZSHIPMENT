@@ -3,10 +3,12 @@
 {
 "FROM":
 [
-"ZI_REPORITORY_004"
+"ZOUTBOUND003"
 ],
 "ASSOCIATED":
-[],
+[
+"ZI_SHIPMENT_003"
+],
 "BASE":
 [],
 "ANNO_REF":

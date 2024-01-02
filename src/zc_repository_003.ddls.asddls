@@ -1,10 +1,12 @@
-@EndUserText.label: 'ZC_REPORITORY_004'
+@EndUserText.label: 'Repository'
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @Metadata.allowExtensions: true
 
-define root view entity ZC_REPORITORY_004 provider contract transactional_query as projection on ZI_REPORITORY_004
+
+define root view entity ZC_REPOSITORY_003 provider contract transactional_query as projection on ZI_REPOSITORY_003
 {
-    key ZreporitoryUUID,
+    key RepositoryUUID,
+    RepositoryID,
     Comments,
     Attachment,
     MimeType,

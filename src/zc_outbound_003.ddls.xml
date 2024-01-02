@@ -3,10 +3,10 @@
  <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>
    <DDLS>
-    <DDLNAME>ZI_REPORITORY_004</DDLNAME>
+    <DDLNAME>ZC_OUTBOUND_003</DDLNAME>
     <DDLANGUAGE>E</DDLANGUAGE>
-    <DDTEXT>ZI_REPORITORY_004</DDTEXT>
-    <SOURCE_TYPE>W</SOURCE_TYPE>
+    <DDTEXT>ZC_OUTBOUND_003</DDTEXT>
+    <SOURCE_TYPE>P</SOURCE_TYPE>
    </DDLS>
   </asx:values>
  </asx:abap>

@@ -5,9 +5,9 @@ typeNamePlural: 'Repositiory',
 title: { type: #STANDARD, value: 'Comments' },
          description: { type: #STANDARD, value: 'Comments' } },
          presentationVariant: [{
-         sortOrder: [{ by: 'ZreporitoryUUID', direction: #ASC }],
+         sortOrder: [{ by: 'RepositoryUUID', direction: #ASC }],
          visualizations: [{type: #AS_LINEITEM}] }] }
-annotate entity ZC_REPORITORY_004 with 
+annotate entity ZC_REPOSITORY_003 with 
 {
 
   @UI.facet: [
@@ -33,13 +33,17 @@ annotate entity ZC_REPORITORY_004 with
         targetQualifier: 'Upload'
     } ]
 
-    @UI: { lineItem:       [ { position: 10, importance: #HIGH , label: 'UUID'} ],
-           identification: [ { position: 10, label: 'UUID' },
+    @UI: { lineItem:       [ { position: 10, importance: #HIGH , label: 'Repository UUID'} ],
+           identification: [ { position: 10, label: 'Repository UUID' },
                              { type: #FOR_ACTION, dataAction: 'make_pdf',  label: 'Make PDF',  position: 1 } ] }
-    ZreporitoryUUID;
+    RepositoryUUID;
 
-    @UI: { lineItem:       [ { position: 20, importance: #HIGH , label: 'Comments'} ],
-           identification: [ { position: 20, label: 'Comments' } ] }
+    @UI: { lineItem:       [ { position: 20, importance: #HIGH , label: 'Repository ID'} ],
+           identification: [ { position: 20, label: 'Repository ID' } ] }
+    RepositoryID;
+
+    @UI: { lineItem:       [ { position: 30, importance: #HIGH , label: 'Comments'} ],
+           identification: [ { position: 30, label: 'Comments' } ] }
     Comments;
 
     @UI: { lineItem:       [ { position: 50, importance: #HIGH , label: 'Attachment'} ],

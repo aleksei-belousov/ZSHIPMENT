@@ -16,22 +16,69 @@ CLASS zcl_shipment_003 DEFINITION PUBLIC FINAL CREATE PUBLIC .
 
 ENDCLASS.
 
-CLASS zcl_shipment_003 IMPLEMENTATION.
 
-  METHOD if_oo_adt_classrun~main.
 
-*    http_call( out ).
+CLASS ZCL_SHIPMENT_003 IMPLEMENTATION.
 
+
+  METHOD business_object_access.
 
     TRY.
-        business_object_access( out ).
 
-      CATCH cx_abap_context_info_error.
+        i_url       = 'https://my404898-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_CustomerSalesAreaText(Customer=''10001722'',SalesOrganization=''1000'',DistributionChannel=''10'',Division=''00'',Language=''EN'',LongTextID=''ZLVS'')'.
+        i_username  = 'INBOUND_USER'.
+        i_password  = 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
+
+        DATA(system_url) = cl_abap_context_info=>get_system_url( ).
+        IF ( system_url(8) = 'my404907' ). " test
+            i_username = 'INBOUND_FIEGE_USER'.
+            i_password = 'JpLftkzhkoktLzvvoxD6oWeXsM#ZXccgfsBBzRpg'.
+        ENDIF.
+
+        DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url ).
+
+        DATA(lo_http_client) = cl_web_http_client_manager=>create_by_http_destination( http_destination ).
+
+        lo_http_client->get_http_request( )->set_authorization_basic(
+            i_username = i_username
+            i_password = i_password
+        ).
+
+        DATA(lo_http_response) = lo_http_client->execute(
+            i_method   = if_web_http_client=>get
+*            i_timeout  = 0
+        ).
+
+        DATA(text) = lo_http_response->get_text( ).
+
+        DATA(status) = lo_http_response->get_status( ).
+
+        out->write( text )->write( status ).
+
+
+    CATCH /iwbep/cx_cp_remote INTO DATA(lx_remote).
+      " Handle remote Exception
+*      RAISE SHORTDUMP lx_remote.
+
+    CATCH /iwbep/cx_gateway INTO DATA(lx_gateway).
+      " Handle Exception
+*      RAISE SHORTDUMP lx_gateway.
+
+    CATCH cx_web_http_client_error INTO DATA(lx_web_http_client_error).
+      " Handle Exception
+*      RAISE SHORTDUMP lx_web_http_client_error.
+
+    CATCH cx_http_dest_provider_error INTO DATA(lx_http_dest_provider_error).
+        "handle exception
+*      RAISE SHORTDUMP lx_http_dest_provider_error.
+
+    CATCH cx_abap_context_info_error INTO DATA(lx_abap_context_info_error).
         "handle exception
 
     ENDTRY.
 
-  ENDMETHOD. " if_oo_adt_classrun~main
+  ENDMETHOD. " business_object_access
+
 
   METHOD http_call.
 
@@ -95,6 +142,23 @@ CLASS zcl_shipment_003 IMPLEMENTATION.
 
   ENDMETHOD. " http_call
 
+
+  METHOD if_oo_adt_classrun~main.
+
+*    http_call( out ).
+
+
+    TRY.
+        business_object_access( out ).
+
+      CATCH cx_abap_context_info_error.
+        "handle exception
+
+    ENDTRY.
+
+  ENDMETHOD. " if_oo_adt_classrun~main
+
+
   METHOD pdf_test.
 
     DATA lv_xml_data        TYPE xstring.
@@ -121,63 +185,4 @@ CLASS zcl_shipment_003 IMPLEMENTATION.
     ENDTRY.
 
   ENDMETHOD. " pdf_test
-
-  METHOD business_object_access.
-
-    TRY.
-
-        i_url       = 'https://my404898-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_CustomerSalesAreaText(Customer=''10001722'',SalesOrganization=''1000'',DistributionChannel=''10'',Division=''00'',Language=''EN'',LongTextID=''ZLVS'')'.
-        i_username  = 'INBOUND_USER'.
-        i_password  = 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
-
-        DATA(system_url) = cl_abap_context_info=>get_system_url( ).
-        IF ( system_url(8) = 'my404907' ). " test
-            i_username = 'INBOUND_FIEGE_USER'.
-            i_password = 'JpLftkzhkoktLzvvoxD6oWeXsM#ZXccgfsBBzRpg'.
-        ENDIF.
-
-        DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url ).
-
-        DATA(lo_http_client) = cl_web_http_client_manager=>create_by_http_destination( http_destination ).
-
-        lo_http_client->get_http_request( )->set_authorization_basic(
-            i_username = i_username
-            i_password = i_password
-        ).
-
-        DATA(lo_http_response) = lo_http_client->execute(
-            i_method   = if_web_http_client=>get
-*            i_timeout  = 0
-        ).
-
-        DATA(text) = lo_http_response->get_text( ).
-
-        DATA(status) = lo_http_response->get_status( ).
-
-        out->write( text )->write( status ).
-
-
-    CATCH /iwbep/cx_cp_remote INTO DATA(lx_remote).
-      " Handle remote Exception
-*      RAISE SHORTDUMP lx_remote.
-
-    CATCH /iwbep/cx_gateway INTO DATA(lx_gateway).
-      " Handle Exception
-*      RAISE SHORTDUMP lx_gateway.
-
-    CATCH cx_web_http_client_error INTO DATA(lx_web_http_client_error).
-      " Handle Exception
-*      RAISE SHORTDUMP lx_web_http_client_error.
-
-    CATCH cx_http_dest_provider_error INTO DATA(lx_http_dest_provider_error).
-        "handle exception
-*      RAISE SHORTDUMP lx_http_dest_provider_error.
-
-    CATCH cx_abap_context_info_error INTO DATA(lx_abap_context_info_error).
-        "handle exception
-
-    ENDTRY.
-
-  ENDMETHOD. " business_object_access
-
 ENDCLASS.

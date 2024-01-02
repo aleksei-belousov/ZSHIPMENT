@@ -31,28 +31,11 @@ etag master LocalLastChangedAt
   determination on_modify_customer on modify { field PartyID; }
 
   // Associations:
-  association _Added {  create ( features : instance, authorization : update ); with draft; }
   association _Available {  create ( features : instance, authorization : update ); with draft; }
+  association _Outbound {  create ( features : instance, authorization : update ); with draft; }
 
   field ( readonly, numbering : managed ) ShipmentUUID;
   field ( readonly ) ShipmentID;
-//  field ( readonly ) Released;
-//  field ( readonly ) ConfirmationDate;
-//  field ( readonly ) PartyID;
-//  field ( readonly ) Tour;
-//  field ( readonly ) TransportationType;
-//  field ( readonly ) FreightForwarderClient;
-//  field ( readonly ) OrganisationFormattedName1;
-//  field ( readonly ) OrganisationFormattedName2;
-//  field ( readonly ) OrganisationFormattedName3;
-//  field ( readonly ) OrganisationFormattedName4;
-//  field ( readonly ) StreetName;
-//  field ( readonly ) HouseID;
-//  field ( readonly ) CityName;
-//  field ( readonly ) CountryCode;
-//  field ( readonly ) TaxJurisdictionCode;
-//  field ( readonly ) StreetPostalCode;
-//  field ( readonly ) Instructions;
 
   side effects
   {
@@ -62,6 +45,7 @@ etag master LocalLastChangedAt
   }
 
 }
+
 
 define behavior for ZI_AVAILABLE_003 alias Available
 persistent table zavailable003
@@ -74,17 +58,23 @@ etag master LocalLastChangedAt
   update;
   delete;
 
+  // Events:
+  determination on_item_create on modify { field AvailableUUID; }
+  determination on_outbound_delivery_modify on modify { field OutboundDelivery; }
+
+  // Associations:
+  association _Shipment { with draft; }
+
   field ( readonly, numbering : managed ) AvailableUUID;
   field ( readonly ) ShipmentUUID;
-//  field ( readonly ) OutboundDelivery;
-
-  association _Shipment { with draft; }
+  field ( readonly ) AvailableID;
 
 }
 
-define behavior for ZI_ADDED_003 alias Added
-persistent table zadded003
-draft table zadded003d
+
+define behavior for ZI_OUTBOUND_003 alias Outbound
+persistent table zoutbound003
+draft table zoutbound003d
 lock dependent by _Shipment
 authorization dependent by _Shipment
 etag master LocalLastChangedAt
@@ -93,9 +83,9 @@ etag master LocalLastChangedAt
   update;
   delete;
 
-  field ( readonly, numbering : managed ) AddedUUID;
+  field ( readonly, numbering : managed ) OutboundUUID;
   field ( readonly ) ShipmentUUID;
-  field ( readonly ) OutboundDelivery;
+  field ( readonly ) OutboundID;
 
   association _Shipment { with draft; }
 

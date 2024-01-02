@@ -1,17 +1,17 @@
-managed implementation in class zbp_i_reporitory_004 unique;
+managed implementation in class zbp_i_repository_003 unique;
 strict ( 2 );
 with draft;
 
-define behavior for ZI_REPORITORY_004 alias Repository
-persistent table zreporitory004
-draft table zreporitory004d
+define behavior for ZI_REPOSITORY_003 alias Repository
+persistent table zrepository003
+draft table zrepository003d
 lock master
 total etag LocalLastChangedAt
 authorization master ( instance )
 etag master LastChangedAt
 {
 
-  field ( readonly, numbering : managed ) ZreporitoryUUID;
+  field ( readonly, numbering : managed ) RepositoryUUID;
 
   // administrative fields: read only
   field ( readonly ) LastChangedAt, LastChangedBy, LocalLastChangedAt, CreatedBy, CreatedAt;

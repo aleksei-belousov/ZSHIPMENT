@@ -3,25 +3,25 @@
  <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>
    <BDEF>
-    <NAME>ZI_REPORITORY_004</NAME>
+    <NAME>ZC_REPOSITORY_003</NAME>
     <TYPE>BDEF/BDO</TYPE>
-    <DESCRIPTION>ZI_REPORITORY_004</DESCRIPTION>
+    <DESCRIPTION>ZC_REPOSITORY_003</DESCRIPTION>
     <DESCRIPTION_TEXT_LIMIT>60</DESCRIPTION_TEXT_LIMIT>
     <LANGUAGE>EN</LANGUAGE>
     <LINKS>
      <item>
-      <HREF>./zi_reporitory_004/source/main/versions</HREF>
+      <HREF>./zc_repository_003/source/main/versions</HREF>
       <REL>http://www.sap.com/adt/relations/versions</REL>
       <TITLE>Historic versions</TITLE>
      </item>
      <item>
-      <HREF>./zi_reporitory_004/source/main</HREF>
+      <HREF>./zc_repository_003/source/main</HREF>
       <REL>http://www.sap.com/adt/relations/source</REL>
       <TYPE>text/plain</TYPE>
       <TITLE>Source Content</TITLE>
      </item>
      <item>
-      <HREF>./zi_reporitory_004/source/main</HREF>
+      <HREF>./zc_repository_003/source/main</HREF>
       <REL>http://www.sap.com/adt/relations/source</REL>
       <TYPE>text/html</TYPE>
       <TITLE>Source Content (HTML)</TITLE>
@@ -29,7 +29,7 @@
     </LINKS>
     <MASTER_LANGUAGE>EN</MASTER_LANGUAGE>
     <ABAP_LANGU_VERSION>5</ABAP_LANGU_VERSION>
-    <SOURCE_URI>./zi_reporitory_004/source/main</SOURCE_URI>
+    <SOURCE_URI>./zc_repository_003/source/main</SOURCE_URI>
     <SOURCE_TYPE>ABAP_SOURCE</SOURCE_TYPE>
     <SOURCE_FIXED_POINT_ARITHMETIC>true</SOURCE_FIXED_POINT_ARITHMETIC>
     <SOURCE_UNICODE_CHECKS_ACTIVE>true</SOURCE_UNICODE_CHECKS_ACTIVE>

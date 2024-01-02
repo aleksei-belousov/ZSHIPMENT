@@ -1,4 +1,0 @@
-@EndUserText.label: 'ZSD_REPOSITORY_004'
-define service ZSD_REPOSITORY_004 {
-  expose ZC_REPORITORY_004;
-}

@@ -22,16 +22,23 @@ annotate entity ZC_AVAILABLE_003 with
     @UI.hidden: true
     AvailableUUID;
 
+    @UI: {  lineItem:       [ { position: 10, label: 'Item ID', cssDefault.width: '100px' } ],
+            identification: [ { position: 10, label: 'Item ID' } ] }
+    AvailableID;
+
     @UI.hidden: true
     ShipmentUUID;
 
-    @UI: {  lineItem:       [ { position: 20, label: 'Outbound Delivery', cssDefault.width: '200px' } ],
+    @UI: {  lineItem:       [ { position: 20, label: 'Outbound Delivery', cssDefault.width: '100px' } ],
             identification: [ { position: 20, label: 'Outbound Delivery' } ] }
     OutboundDelivery;
 
+    @UI: {  lineItem:       [ { position: 30, label: 'Number of Packages', cssDefault.width: '150px' } ],
+            identification: [ { position: 30, label: 'Number of Packages' } ] }
+    UnloadingPointName;
 
-    @UI: {  lineItem:       [ { position: 30, label: 'Sold To Party', cssDefault.width: '200px' } ],
-            identification: [ { position: 30, label: 'Sold To Party' } ] }
+    @UI: {  lineItem:       [ { position: 40, label: 'Sold To Party', cssDefault.width: '200px' } ],
+            identification: [ { position: 40, label: 'Sold To Party' } ] }
     @UI.hidden: true
     SoldToParty;
 

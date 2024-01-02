@@ -4,9 +4,9 @@
   <asx:values>
    <SRVB>
     <METADATA>
-     <NAME>ZSB_REPOSITORY_004</NAME>
+     <NAME>ZSB_REPOSITORY_003</NAME>
      <TYPE>SRVB/SVB</TYPE>
-     <DESCRIPTION>ZSB_REPOSITORY_004</DESCRIPTION>
+     <DESCRIPTION>ZSB_REPOSITORY_003</DESCRIPTION>
      <LANGUAGE>EN</LANGUAGE>
      <LINKS>
       <item>
@@ -15,7 +15,7 @@
        <TITLE>Historic versions</TITLE>
       </item>
       <item>
-       <HREF>/sap/bc/adt/businessservices/odatav4/ZSB_REPOSITORY_004</HREF>
+       <HREF>/sap/bc/adt/businessservices/odatav4/ZSB_REPOSITORY_003</HREF>
        <REL>http://www.sap.com/categories/odatav4</REL>
        <TYPE>application/vnd.sap.adt.businessservices.odatav4.v1+xml</TYPE>
        <TITLE>ODATAV4</TITLE>
@@ -44,21 +44,21 @@
     </METADATA>
     <CONTENT>
      <BIND_TYPE_IMPL>
-      <NAME>ZSB_REPOSITORY_004</NAME>
+      <NAME>ZSB_REPOSITORY_003</NAME>
      </BIND_TYPE_IMPL>
      <BIND_TYPE>ODATA</BIND_TYPE>
      <BIND_TYPE_VERSION>V4</BIND_TYPE_VERSION>
      <SERVICES>
       <item>
-       <SERVICE_NAME>ZSD_REPOSITORY_004</SERVICE_NAME>
+       <SERVICE_NAME>ZSD_REPOSITORY_003</SERVICE_NAME>
        <SERVICE_CONTENT>
         <item>
          <SERVICE_VERSION>0001</SERVICE_VERSION>
          <RELEASE_STATE>NOT_RELEASED</RELEASE_STATE>
          <SRVD_REF>
-          <URI>/sap/bc/adt/ddic/srvd/sources/zsd_repository_004</URI>
+          <URI>/sap/bc/adt/ddic/srvd/sources/zsd_repository_003</URI>
           <TYPE>SRVD/SRV</TYPE>
-          <NAME>ZSD_REPOSITORY_004</NAME>
+          <NAME>ZSD_REPOSITORY_003</NAME>
          </SRVD_REF>
          <BIND_TYPE_DATA>
           <CONTENT>

@@ -5,6 +5,7 @@
 define view entity ZC_AVAILABLE_003 as projection on ZI_AVAILABLE_003 as Available
 {
     key AvailableUUID,
+    AvailableID,
     ShipmentUUID,
 
     @Consumption.valueHelpDefinition: [ { entity: { name: 'I_OutboundDeliveryTP', element: 'OutboundDelivery' },
@@ -12,6 +13,7 @@ define view entity ZC_AVAILABLE_003 as projection on ZI_AVAILABLE_003 as Availab
     @EndUserText.label: 'Outbound Delivery'
     OutboundDelivery,
 
+    _DeliveryDocument.UnloadingPointName as UnloadingPointName,
     _Shipment.SoldToParty as SoldToParty, 
 
     CreatedBy,
@@ -21,5 +23,6 @@ define view entity ZC_AVAILABLE_003 as projection on ZI_AVAILABLE_003 as Availab
     LocalLastChangedAt,
     
     /* Associations */
-    _Shipment : redirected to parent ZC_SHIPMENT_003
+    _Shipment : redirected to parent ZC_SHIPMENT_003,
+    _DeliveryDocument
 }

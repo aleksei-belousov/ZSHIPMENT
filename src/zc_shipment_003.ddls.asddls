@@ -7,13 +7,12 @@ define root view entity ZC_SHIPMENT_003 provider contract transactional_query as
     key ShipmentUUID,
     ShipmentID,
 
-    @Consumption.valueHelpDefinition: [ { entity: { name: 'ZI_VBSK_003', element: 'CollectiveProcessing' } } ]
-    @EndUserText.label: 'Collective Processing'
-    CollectiveProcessing, 
-
-    @Consumption.valueHelpDefinition: [ { entity: { name: 'I_Customer', element: 'Customer' } } ]
+    @Consumption.valueHelpDefinition: [ { entity: { name: 'I_Customer', element: 'Customer' }, useForValidation: true } ]
+    @ObjectModel.foreignKey.association: '_Customer'
     @EndUserText.label: 'Sold To Party'
+    @ObjectModel.text.element: ['CustomerName']
     SoldToParty as SoldToParty,
+    _Customer.CustomerName as CustomerName,
     
     Released,
     ConfirmationDate,
@@ -37,7 +36,8 @@ define root view entity ZC_SHIPMENT_003 provider contract transactional_query as
     TaxJurisdictionCode,
     StreetPostalCode,
     Instructions, 
-
+    _BuPaIdentification.BPIdentificationNumber as BPIdentificationNumber,
+    
     CreatedBy,
     CreatedAt,
     LastChangedBy,
@@ -46,6 +46,8 @@ define root view entity ZC_SHIPMENT_003 provider contract transactional_query as
 
     /* Associations */
     _Available: redirected to composition child ZC_AVAILABLE_003,
-    _Added: redirected to composition child ZC_ADDED_003
+    _Outbound: redirected to composition child ZC_OUTBOUND_003,
+    _Customer,
+    _BuPaIdentification // Make association public
 
 }

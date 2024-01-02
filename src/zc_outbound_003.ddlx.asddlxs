@@ -1,0 +1,56 @@
+@Metadata.layer: #CORE
+@UI: {
+    headerInfo: { typeName: 'Outbound',
+                  typeNamePlural: 'Outbounds',
+                  title: { type: #STANDARD, label: 'Delivery', value: 'OutboundUUID' } },
+    presentationVariant: [{ sortOrder: [{ by: 'OutboundUUID', direction: #ASC }] }] }
+annotate entity ZC_OUTBOUND_003
+    with 
+{
+
+    @UI.facet: [
+        {
+            id:            'Outbound',
+            purpose:       #STANDARD,
+            type:          #IDENTIFICATION_REFERENCE,
+            label:         'Outbound',
+            position:      10
+        }
+    ]
+
+    @UI.hidden: true
+    OutboundUUID;
+
+    @UI: {  lineItem:       [ { position: 10, label: 'Outbound ID', cssDefault.width: '100px' } ],
+            identification: [ { position: 10, label: 'Outbound ID' } ] }
+    OutboundID;
+
+    @UI.hidden: true
+    ShipmentUUID;
+
+    @UI: {  lineItem:       [ { position: 20, label: 'Attachment', cssDefault.width: '100px' } ],
+            identification: [ { position: 20, label: 'Attachment' } ] }
+    Attachment;
+
+    @UI.hidden: true
+    MimeType;
+
+    @UI.hidden: true
+    FileName;
+
+    @UI.hidden: true
+    Createdby;
+
+    @UI.hidden: true
+    Createdat;
+
+    @UI.hidden: true
+    Lastchangedby;
+
+    @UI.hidden: true
+    Lastchangedat;
+
+    @UI.hidden: true
+    Locallastchangedat;
+
+}

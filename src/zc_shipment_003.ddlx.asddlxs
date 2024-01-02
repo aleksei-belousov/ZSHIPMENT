@@ -27,33 +27,32 @@ annotate entity ZC_SHIPMENT_003 with
             type:         #LINEITEM_REFERENCE,
             position:     20,
             targetElement: '_Available'
-         }/*,
-        // Added
+         },
+        // Outbound
         {
             hidden:       false,
-            label:        'Added',
-            id:           'AddedUUID',
+            label:        'Outbound',
+            id:           'OutboundUUID',
             purpose:      #STANDARD,
             type:         #LINEITEM_REFERENCE,
             position:     30,
-            targetElement: '_Added'
+            targetElement: '_Outbound'
          }
-         */
     ]
 
     @UI.hidden: true
     ShipmentUUID;
 
     @UI: {  lineItem:       [ { position: 20, label: 'Shipment ID', cssDefault.width: '200px' } ],
-            identification: [ { position: 20, label: 'Shipment ID' }/*, 
-                              { type: #FOR_ACTION, dataAction: 'retrieve',  label: 'Retrieve',  position: 1 }*/,
-                              { type: #FOR_ACTION, dataAction: 'release',   label: 'Release',   position: 2 } ] }
+            identification: [ { position: 20, label: 'Shipment ID' }, 
+                              { type: #FOR_ACTION, dataAction: 'create_tariff_document',    label: 'Create Tariff Document',    position: 1 },
+                              { type: #FOR_ACTION, dataAction: 'release',                   label: 'Release',                   position: 2 } ] }
     ShipmentID;
 
-    @UI: {  lineItem:       [ { position: 30, label: 'Collective Processing', cssDefault.width: '200px' } ],
-            identification: [ { position: 30, label: 'Collective Processing' } ] }
-    @UI.hidden: true
-    CollectiveProcessing;
+//    @UI: {  lineItem:       [ { position: 30, label: 'Collective Processing', cssDefault.width: '200px' } ],
+//            identification: [ { position: 30, label: 'Collective Processing' } ] }
+//    @UI.hidden: true
+//    CollectiveProcessing;
 
     @UI: {  lineItem:       [ { position: 40, label: 'Sold To Party', cssDefault.width: '200px' } ],
             identification: [ { position: 40, label: 'Sold To Party' } ] }
@@ -127,6 +126,10 @@ annotate entity ZC_SHIPMENT_003 with
     @UI: {  lineItem:       [ { position: 210, label: 'Instructions', cssDefault.width: '200px' } ],
             identification: [ { position: 210, label: 'Instructions' } ] }
     Instructions;
+
+    @UI: {  lineItem:       [ { position: 220, label: 'GLN', cssDefault.width: '200px' } ],
+            identification: [ { position: 220, label: 'GLN' } ] }
+    BPIdentificationNumber;
 
     @UI.hidden: true
     CreatedBy;

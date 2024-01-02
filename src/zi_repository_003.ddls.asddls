@@ -1,9 +1,11 @@
 @AccessControl.authorizationCheck: #NOT_REQUIRED
-@EndUserText.label: 'ZI_REPORITORY_004'
+@EndUserText.label: 'Repository'
 
-define root view entity ZI_REPORITORY_004 as select from zreporitory004
+define root view entity ZI_REPOSITORY_003 as select from zrepository003
 {
-    key zreporitoryuuid as ZreporitoryUUID,
+    key repositoryuuid as RepositoryUUID,
+
+    repositoryid as RepositoryID,
     comments as Comments,
 
     @Semantics.largeObject:

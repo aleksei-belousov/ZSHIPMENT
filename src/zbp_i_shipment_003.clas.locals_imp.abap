@@ -28,8 +28,10 @@ CLASS lhc_shipment DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
     METHODS on_save_customer FOR DETERMINE ON SAVE
       IMPORTING keys FOR Shipment~on_save_customer.
+
     METHODS on_modify_customer FOR DETERMINE ON MODIFY
       IMPORTING keys FOR Shipment~on_modify_customer.
+
     METHODS create_tariff_document FOR MODIFY
       IMPORTING keys FOR ACTION Shipment~create_tariff_document.
 
@@ -112,88 +114,88 @@ CLASS lhc_shipment IMPLEMENTATION.
 * Retrieve Outbound Delivery
   METHOD retrieve.
 
-    DATA it_available_create TYPE TABLE FOR CREATE zi_shipment_003\_Available.
-
-*   read transfered instances
-    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
-      ENTITY Shipment
-      ALL FIELDS
-      WITH CORRESPONDING #( keys )
-      RESULT DATA(entities).
-
-    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
-
-        IF ( <entity>-%is_draft = '00' ). " Saved
-        ENDIF.
-
-        IF ( <entity>-%is_draft = '01' ). " Draft
-        ENDIF.
-
-*       Read Available Table
-        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
-            ENTITY Shipment
-            BY \_Available
-            ALL FIELDS WITH VALUE #( (
-                %tky = <entity>-%tky
-            ) )
-            RESULT DATA(lt_available)
-            FAILED DATA(failed1)
-            REPORTED DATA(reported1).
-
-*       Delete Actual Size Table
-        LOOP AT lt_available INTO DATA(ls_available).
-            MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
-                ENTITY Available
-                DELETE FROM VALUE #( ( %tky = ls_available-%tky ) )
-                MAPPED DATA(mapped2)
-                FAILED DATA(failed2)
-                REPORTED DATA(reported2).
-        ENDLOOP.
-
-        DATA(collective_processing) = <entity>-CollectiveProcessing. " '1'
-
-*       Read Collective Processing (header) (via SQL)
-        SELECT SINGLE * FROM zi_vbsk_003 WHERE ( CollectiveProcessing = @collective_processing ) INTO @DATA(ls_collective_processing).
-
-*       Read Collective Processing Document (items) (via CDS)
-        READ ENTITIES OF zi_vbsk_003
-            ENTITY CollectiveProcessing BY \_CollectiveProcessingDocument
-            ALL FIELDS WITH VALUE #( (
-*                %is_draft = <entity>-%is_draft
-                ZvbskUUID = ls_collective_processing-ZvbskUUID
-            ) )
-            RESULT DATA(lt_document)
-            FAILED DATA(failed3)
-            REPORTED DATA(reported3).
-
-        SORT lt_document STABLE BY CollectiveProcessingDocument.
-
-        LOOP AT lt_document INTO DATA(ls_document).
-            APPEND VALUE #(
-                %is_draft           = <entity>-%is_draft
-                ShipmentUUID        = <entity>-ShipmentUUID
-                %target = VALUE #( (
-                    %is_draft           = <entity>-%is_draft
-                    ShipmentUUID        = <entity>-ShipmentUUID
-                    OutboundDelivery    = ls_document-CollectiveProcessingDocument
-                ) )
-            ) TO it_available_create.
-        ENDLOOP.
-
-*       Create Available Rows
-        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
-            ENTITY Shipment CREATE BY \_Available
-            AUTO FILL CID FIELDS (
-*                AvailableUUID
-                ShipmentUUID
-                OutboundDelivery
-            )
-            WITH it_available_create
-            MAPPED DATA(mapped4)
-            FAILED DATA(failed4)
-            REPORTED DATA(reporeted4).
-
-    ENDLOOP.
+*    DATA it_available_create TYPE TABLE FOR CREATE zi_shipment_003\_Available.
+*
+**   read transfered instances
+*    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+*      ENTITY Shipment
+*      ALL FIELDS
+*      WITH CORRESPONDING #( keys )
+*      RESULT DATA(entities).
+*
+*    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+*
+*        IF ( <entity>-%is_draft = '00' ). " Saved
+*        ENDIF.
+*
+*        IF ( <entity>-%is_draft = '01' ). " Draft
+*        ENDIF.
+*
+**       Read Available Table
+*        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+*            ENTITY Shipment
+*            BY \_Available
+*            ALL FIELDS WITH VALUE #( (
+*                %tky = <entity>-%tky
+*            ) )
+*            RESULT DATA(lt_available)
+*            FAILED DATA(failed1)
+*            REPORTED DATA(reported1).
+*
+**       Delete Actual Size Table
+*        LOOP AT lt_available INTO DATA(ls_available).
+*            MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+*                ENTITY Available
+*                DELETE FROM VALUE #( ( %tky = ls_available-%tky ) )
+*                MAPPED DATA(mapped2)
+*                FAILED DATA(failed2)
+*                REPORTED DATA(reported2).
+*        ENDLOOP.
+*
+*        DATA(collective_processing) = <entity>-CollectiveProcessing. " '1'
+*
+**       Read Collective Processing (header) (via SQL)
+*        SELECT SINGLE * FROM zi_vbsk_003 WHERE ( CollectiveProcessing = @collective_processing ) INTO @DATA(ls_collective_processing).
+*
+**       Read Collective Processing Document (items) (via CDS)
+*        READ ENTITIES OF zi_vbsk_003
+*            ENTITY CollectiveProcessing BY \_CollectiveProcessingDocument
+*            ALL FIELDS WITH VALUE #( (
+**                %is_draft = <entity>-%is_draft
+*                ZvbskUUID = ls_collective_processing-ZvbskUUID
+*            ) )
+*            RESULT DATA(lt_document)
+*            FAILED DATA(failed3)
+*            REPORTED DATA(reported3).
+*
+*        SORT lt_document STABLE BY CollectiveProcessingDocument.
+*
+*        LOOP AT lt_document INTO DATA(ls_document).
+*            APPEND VALUE #(
+*                %is_draft           = <entity>-%is_draft
+*                ShipmentUUID        = <entity>-ShipmentUUID
+*                %target = VALUE #( (
+*                    %is_draft           = <entity>-%is_draft
+*                    ShipmentUUID        = <entity>-ShipmentUUID
+*                    OutboundDelivery    = ls_document-CollectiveProcessingDocument
+*                ) )
+*            ) TO it_available_create.
+*        ENDLOOP.
+*
+**       Create Available Rows
+*        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+*            ENTITY Shipment CREATE BY \_Available
+*            AUTO FILL CID FIELDS (
+**                AvailableUUID
+*                ShipmentUUID
+*                OutboundDelivery
+*            )
+*            WITH it_available_create
+*            MAPPED DATA(mapped4)
+*            FAILED DATA(failed4)
+*            REPORTED DATA(reporeted4).
+*
+*    ENDLOOP.
 
   ENDMETHOD. " retrieve
 
@@ -216,7 +218,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                 RETURN.
             ENDIF.
 
-            READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            READ ENTITIES OF zi_shipment_003  IN LOCAL MODE
                 ENTITY Shipment
                 BY \_Available
                 ALL FIELDS WITH VALUE #( (
@@ -234,6 +236,8 @@ CLASS lhc_shipment IMPLEMENTATION.
 
             SORT lt_available STABLE BY OutboundDelivery.
 
+            SELECT SINGLE BPIdentificationNumber FROM zc_shipment_003 WHERE ( ShipmentUUID = @<entity>-ShipmentUUID ) INTO @DATA(bpIdentificationNumber).
+
             DATA request_body TYPE string VALUE ''.
 
 *           Make body as an XML
@@ -244,6 +248,7 @@ CLASS lhc_shipment IMPLEMENTATION.
             request_body = request_body && '<TransportationType>' && <entity>-TransportationType && '</TransportationType>' && cl_abap_char_utilities=>cr_lf.
             request_body = request_body && '<FreightForwarderClient>' && <entity>-FreightForwarderClient && '</FreightForwarderClient>' && cl_abap_char_utilities=>cr_lf.
             request_body = request_body && '<PartyID>' && <entity>-PartyID && '</PartyID>' && cl_abap_char_utilities=>cr_lf.
+            request_body = request_body && '<GLN>' && bpIdentificationNumber && '</GLN>' && cl_abap_char_utilities=>cr_lf.
             request_body = request_body && '<OrganisationFormattedName1>' && <entity>-OrganisationFormattedName1 && '</OrganisationFormattedName1>' && cl_abap_char_utilities=>cr_lf.
             request_body = request_body && '<OrganisationFormattedName2>' && <entity>-OrganisationFormattedName2 && '</OrganisationFormattedName2>' && cl_abap_char_utilities=>cr_lf.
             request_body = request_body && '<OrganisationFormattedName3>' && <entity>-OrganisationFormattedName3 && '</OrganisationFormattedName3>' && cl_abap_char_utilities=>cr_lf.
@@ -256,9 +261,13 @@ CLASS lhc_shipment IMPLEMENTATION.
             request_body = request_body && '<StreetPostalCode>' && <entity>-StreetPostalCode && '</StreetPostalCode>' && cl_abap_char_utilities=>cr_lf.
             request_body = request_body && '<Instructions>' && <entity>-Instructions && '</Instructions>' && cl_abap_char_utilities=>cr_lf.
             LOOP AT lt_available INTO DATA(ls_available).
+                DATA(availableID) = |{ ls_available-AvailableID ALPHA = OUT }|.
                 DATA(outboundDelivery) = |{ ls_available-OutboundDelivery ALPHA = IN }|.
+                SELECT SINGLE UnloadingPointName FROM zc_available_003 WHERE ( AvailableUUID = @ls_available-availableUUID ) INTO @DATA(unloadingPointName).
                 request_body = request_body && '<OutboundDelivery>' && cl_abap_char_utilities=>cr_lf.
+                request_body = request_body && '<ItemID>' && availableID && '</ItemID>' && cl_abap_char_utilities=>cr_lf.
                 request_body = request_body && '<ID>' && outboundDelivery && '</ID>' && cl_abap_char_utilities=>cr_lf.
+                request_body = request_body && '<NumberOfPackages>' && unloadingPointName && '</NumberOfPackages>' && cl_abap_char_utilities=>cr_lf.
                 request_body = request_body && '</OutboundDelivery>' && cl_abap_char_utilities=>cr_lf.
             ENDLOOP.
             request_body = request_body && '</ShipmentBinding>' && cl_abap_char_utilities=>cr_lf.
@@ -427,7 +436,7 @@ CLASS lhc_shipment IMPLEMENTATION.
 *            UPDATE FIELDS ( ShipmentID )
 *            WITH VALUE #( (
 *                %tky        = <entity>-%tky
-*                ShipmentID  = shipmentid
+**                ShipmentID  = shipmentid
 *            ) )
 *            FAILED DATA(ls_failed1)
 *            MAPPED DATA(ls_mapped1)
@@ -441,6 +450,8 @@ CLASS lhc_shipment IMPLEMENTATION.
   ENDMETHOD. " on_save_customer
 
   METHOD on_modify_customer.
+
+    DATA partyID TYPE zi_shipment_003-PartyID.
 
      " Read transfered instances
     READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
@@ -456,7 +467,24 @@ CLASS lhc_shipment IMPLEMENTATION.
         IF ( <entity>-%is_draft = '01' ). " Draft
         ENDIF.
 
-        DATA(partyID) = |{ <entity>-PartyID ALPHA = IN }|.
+        partyID = |{ <entity>-PartyID ALPHA = IN }|. " Add leading zeros
+
+        IF ( partyID <> <entity>-PartyID ).
+
+            MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+                ENTITY Shipment
+                UPDATE FIELDS (
+                    PartyID
+                )
+                WITH VALUE #( (
+                    %tky    = <entity>-%tky
+                    PartyID = partyID
+                ) )
+                MAPPED DATA(mapped1)
+                FAILED DATA(failed1)
+                REPORTED DATA(reported1).
+
+        ENDIF.
 
         " Read transfered instances
         SELECT SINGLE * FROM I_Customer WHERE ( Customer = @partyID ) INTO @DATA(ls_customer).
@@ -547,9 +575,9 @@ CLASS lhc_shipment IMPLEMENTATION.
                 FreightForwarderClient      = freightForwarderClient
                 Instructions                = tx03
             ) )
-            MAPPED DATA(mapped1)
-            FAILED DATA(failed1)
-            REPORTED DATA(reported1).
+            MAPPED DATA(mapped2)
+            FAILED DATA(failed2)
+            REPORTED DATA(reported2).
 
 
     ENDLOOP.
@@ -816,3 +844,112 @@ CLASS lsc_zi_shipment_003 IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS. " lsc_zi_shipment_003 IMPLEMENTATION
+
+
+CLASS lhc_available DEFINITION INHERITING FROM cl_abap_behavior_handler.
+
+  PRIVATE SECTION.
+
+    METHODS on_item_create FOR DETERMINE ON MODIFY IMPORTING keys FOR Available~on_item_create.
+    METHODS on_outbound_delivery_modify FOR DETERMINE ON MODIFY IMPORTING keys FOR Available~on_outbound_delivery_modify.
+
+ENDCLASS. " lhc_available DEFINITION
+
+CLASS lhc_available IMPLEMENTATION.
+
+  METHOD on_item_create.
+
+     " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Available
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+        ENDIF.
+        IF ( <entity>-%is_draft = '01' ). " Draft
+        ENDIF.
+
+*       Read items
+        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment BY \_Available
+            ALL FIELDS WITH VALUE #( (
+                %is_draft       = <entity>-%is_draft
+                ShipmentUUID    = <entity>-ShipmentUUID
+            ) )
+            RESULT DATA(lt_available)
+            FAILED DATA(failed1)
+            REPORTED DATA(reported1).
+
+        SORT lt_available STABLE BY AvailableID DESCENDING.
+
+        DATA newAvailableID TYPE zi_available_003-AvailableID.
+
+        IF ( lt_available[] IS INITIAL ).
+            newAvailableID = 10.
+        ELSE.
+            READ TABLE lt_available INDEX 1 INTO DATA(available).
+            newAvailableID = available-AvailableID + 10.
+        ENDIF.
+
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Available
+            UPDATE FIELDS (
+                AvailableID
+            )
+            WITH VALUE #( (
+                %is_draft       = <entity>-%is_draft
+                AvailableUUID   = <entity>-AvailableUUID
+                AvailableID     = newAvailableID
+            ) )
+            MAPPED DATA(mapped2)
+            FAILED DATA(failed2)
+            REPORTED DATA(reported2).
+
+    ENDLOOP.
+
+  ENDMETHOD. " on_item_create
+
+  METHOD on_outbound_delivery_modify.
+
+    DATA outboundDelivery TYPE zi_available_003-OutboundDelivery.
+
+     " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Available
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        outboundDelivery = |{ <entity>-OutboundDelivery ALPHA = IN }|. " Add leading zeros
+
+        IF ( outboundDelivery <> <entity>-OutboundDelivery ).
+
+            MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+                ENTITY Available
+                UPDATE FIELDS (
+                    OutboundDelivery
+                )
+                WITH VALUE #( (
+*                    %is_draft           = <entity>-%is_draft
+*                    AvailableUUID       = <entity>-AvailableUUID
+                    %tky                = <entity>-%tky
+
+                    OutboundDelivery    = outboundDelivery
+                ) )
+                MAPPED DATA(mapped2)
+                FAILED DATA(failed2)
+                REPORTED DATA(reported2).
+
+        ENDIF.
+
+    ENDLOOP.
+
+  ENDMETHOD. " on_outbound_delivery_modify
+
+ENDCLASS. " lhc_available IMPLEMENTATION
