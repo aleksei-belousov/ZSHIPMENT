@@ -21,9 +21,11 @@ etag master LocalLastChangedAt
   draft action Discard /*with additional implementation*/;
 
   // Actions:
-  action retrieve;
   action release;
+  action create_invoice;
+  action create_tkz_list;
   action create_tariff_document;
+  action create_eci; // csv
 
   // Events:
   determination on_create on modify { field ShipmentUUID; }
@@ -39,9 +41,9 @@ etag master LocalLastChangedAt
 
   side effects
   {
-    action retrieve affects entity _Available;
     action release affects field Released;
     field PartyID affects $self;
+    action create_tariff_document affects entity _Outbound;
   }
 
 }
@@ -59,7 +61,7 @@ etag master LocalLastChangedAt
   delete;
 
   // Events:
-  determination on_item_create on modify { field AvailableUUID; }
+  determination on_available_create on modify { field AvailableUUID; }
   determination on_outbound_delivery_modify on modify { field OutboundDelivery; }
 
   // Associations:
@@ -83,10 +85,14 @@ etag master LocalLastChangedAt
   update;
   delete;
 
+  // Events:
+  determination on_outbound_create on modify { field OutboundUUID; }
+
+  // Associations:
+  association _Shipment { with draft; }
+
   field ( readonly, numbering : managed ) OutboundUUID;
   field ( readonly ) ShipmentUUID;
   field ( readonly ) OutboundID;
-
-  association _Shipment { with draft; }
 
 }

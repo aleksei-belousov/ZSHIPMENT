@@ -1,8 +1,8 @@
 @Metadata.layer: #CORE
 @UI: {
-    headerInfo: { typeName: 'Delivery',
-                  typeNamePlural: 'Deliveries',
-                  title: { type: #STANDARD, label: 'Delivery', value: 'AvailableUUID' } },
+    headerInfo: { typeName: 'Outbound delivery',
+                  typeNamePlural: 'Outbound delivery',
+                  title: { type: #STANDARD, label: 'Outbound delivery', value: 'AvailableUUID' } },
     presentationVariant: [{ sortOrder: [{ by: 'AvailableUUID', direction: #ASC }] }] }
 //@Search.searchable: true
 
@@ -14,7 +14,7 @@ annotate entity ZC_AVAILABLE_003 with
             id:            'Delivery',
             purpose:       #STANDARD,
             type:          #IDENTIFICATION_REFERENCE,
-            label:         'Delivery',
+            label:         'Outbound delivery',
             position:      10
         }
     ]

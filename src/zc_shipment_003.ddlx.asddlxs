@@ -18,20 +18,20 @@ annotate entity ZC_SHIPMENT_003 with
             label:         'Shipment',
             position:      10
         },
-        // Available
+        // Outbound delivery
         {
             hidden:       false,
-            label:        'Delivery',
+            label:        'Outbound delivery',
             id:           'AvailableUUID',
             purpose:      #STANDARD,
             type:         #LINEITEM_REFERENCE,
             position:     20,
             targetElement: '_Available'
          },
-        // Outbound
+        // Outbound document
         {
             hidden:       false,
-            label:        'Outbound',
+            label:        'Outbound document',
             id:           'OutboundUUID',
             purpose:      #STANDARD,
             type:         #LINEITEM_REFERENCE,
@@ -45,14 +45,12 @@ annotate entity ZC_SHIPMENT_003 with
 
     @UI: {  lineItem:       [ { position: 20, label: 'Shipment ID', cssDefault.width: '200px' } ],
             identification: [ { position: 20, label: 'Shipment ID' }, 
-                              { type: #FOR_ACTION, dataAction: 'create_tariff_document',    label: 'Create Tariff Document',    position: 1 },
-                              { type: #FOR_ACTION, dataAction: 'release',                   label: 'Release',                   position: 2 } ] }
+                              { type: #FOR_ACTION, dataAction: 'create_invoice',            label: 'Create Invoice',        position: 1 },
+                              { type: #FOR_ACTION, dataAction: 'create_tkz_list',           label: 'Create TKZ List',       position: 2 },
+                              { type: #FOR_ACTION, dataAction: 'create_tariff_document',    label: 'Create Tariff Document',position: 3 },
+                              { type: #FOR_ACTION, dataAction: 'create_eci',                label: 'Create ECI csv',        position: 4 },
+                              { type: #FOR_ACTION, dataAction: 'release',                   label: 'Release',                position: 5 } ] }
     ShipmentID;
-
-//    @UI: {  lineItem:       [ { position: 30, label: 'Collective Processing', cssDefault.width: '200px' } ],
-//            identification: [ { position: 30, label: 'Collective Processing' } ] }
-//    @UI.hidden: true
-//    CollectiveProcessing;
 
     @UI: {  lineItem:       [ { position: 40, label: 'Sold To Party', cssDefault.width: '200px' } ],
             identification: [ { position: 40, label: 'Sold To Party' } ] }

@@ -1,11 +1,11 @@
 @Metadata.layer: #CORE
 @UI: { headerInfo: {
-typeName: 'Repositiory',
-typeNamePlural: 'Repositiory',
-title: { type: #STANDARD, value: 'Comments' },
+typeName: 'Web Repositiory',
+typeNamePlural: 'Web Repositiory',
+title: { type: #STANDARD, value: 'RepositoryID' },
          description: { type: #STANDARD, value: 'Comments' } },
          presentationVariant: [{
-         sortOrder: [{ by: 'RepositoryUUID', direction: #ASC }],
+         sortOrder: [{ by: 'RepositoryID', direction: #ASC }],
          visualizations: [{type: #AS_LINEITEM}] }] }
 annotate entity ZC_REPOSITORY_003 with 
 {
@@ -20,7 +20,7 @@ annotate entity ZC_REPOSITORY_003 with
         id:       'Repositorydet',
         purpose:  #STANDARD,
         type:     #IDENTIFICATION_REFERENCE,
-        label:    'Repository Details',
+        label:    'Web Repository Details',
         parentId: 'GeneralInfo',
         position: 10 },
     {
@@ -28,14 +28,15 @@ annotate entity ZC_REPOSITORY_003 with
         purpose:  #STANDARD,
         type:     #FIELDGROUP_REFERENCE,
         parentId: 'GeneralInfo',
-        label:    'Upload XDP',
+        label:    'Upload',
         position: 20,
         targetQualifier: 'Upload'
     } ]
 
     @UI: { lineItem:       [ { position: 10, importance: #HIGH , label: 'Repository UUID'} ],
-           identification: [ { position: 10, label: 'Repository UUID' },
-                             { type: #FOR_ACTION, dataAction: 'make_pdf',  label: 'Make PDF',  position: 1 } ] }
+           identification: [ { position: 10, label: 'Repository UUID' }/*,
+                             { type: #FOR_ACTION, dataAction: 'make_pdf',  label: 'Make PDF',  position: 1 }*/ ] }
+    @UI.hidden: true
     RepositoryUUID;
 
     @UI: { lineItem:       [ { position: 20, importance: #HIGH , label: 'Repository ID'} ],
@@ -58,9 +59,9 @@ annotate entity ZC_REPOSITORY_003 with
     @UI.hidden: true
     FileName;
 
-    @UI: { lineItem:       [ { position: 60, importance: #HIGH , label: 'Attachment XDP'} ],
-           /*identification: [ { position: 60, label: 'Attachment XDP' } ]*/
-           fieldGroup:     [ { position: 60, qualifier: 'Upload' , label: 'Attachment XDP'} ] }
+    @UI: { lineItem:       [ { position: 60, importance: #HIGH , label: 'Template (XDP)'} ],
+           /*identification: [ { position: 60, label: 'Template (XDP)' } ]*/
+           fieldGroup:     [ { position: 60, qualifier: 'Upload' , label: 'Template (XDP)'} ] }
     XDP;
 
     @UI.hidden: true
@@ -72,6 +73,7 @@ annotate entity ZC_REPOSITORY_003 with
     @UI: { lineItem:       [ { position: 70, importance: #HIGH , label: 'Attachment PDF'} ],
            /*identification: [ { position: 70, label: 'Attachment PDF' } ]*/
            fieldGroup:     [ { position: 70, qualifier: 'Upload' , label: 'Attachment PDF'} ] }
+    @UI.hidden: true
     PDF;
 
     @UI.hidden: true

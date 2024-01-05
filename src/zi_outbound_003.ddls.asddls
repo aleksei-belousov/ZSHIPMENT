@@ -8,7 +8,13 @@ association to parent ZI_SHIPMENT_003 as _Shipment on $projection.ShipmentUUID =
 
     shipmentuuid as ShipmentUUID,
 
+    @Semantics.largeObject:
+    { mimeType: 'MimeType',
+    fileName: 'FileName',
+    contentDispositionPreference: #INLINE }
     attachment as Attachment,
+
+    @Semantics.mimeType: true
     mimetype as MimeType,
     filename as FileName,
 

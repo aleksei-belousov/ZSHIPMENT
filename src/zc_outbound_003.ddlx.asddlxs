@@ -1,11 +1,12 @@
 @Metadata.layer: #CORE
 @UI: {
-    headerInfo: { typeName: 'Outbound',
-                  typeNamePlural: 'Outbounds',
-                  title: { type: #STANDARD, label: 'Delivery', value: 'OutboundUUID' } },
+    headerInfo: { typeName: 'Outbound docuemnt',
+                  typeNamePlural: 'Outbound document',
+                  title: { type: #STANDARD, label: 'Outbound document', value: 'OutboundUUID' } },
     presentationVariant: [{ sortOrder: [{ by: 'OutboundUUID', direction: #ASC }] }] }
-annotate entity ZC_OUTBOUND_003
-    with 
+//@Search.searchable: true
+
+annotate entity ZC_OUTBOUND_003 with 
 {
 
     @UI.facet: [
@@ -13,7 +14,7 @@ annotate entity ZC_OUTBOUND_003
             id:            'Outbound',
             purpose:       #STANDARD,
             type:          #IDENTIFICATION_REFERENCE,
-            label:         'Outbound',
+            label:         'Outbound document',
             position:      10
         }
     ]
