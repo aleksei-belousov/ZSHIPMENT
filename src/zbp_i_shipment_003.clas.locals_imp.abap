@@ -23,9 +23,6 @@ CLASS lhc_shipment DEFINITION INHERITING FROM cl_abap_behavior_handler.
     METHODS on_create FOR DETERMINE ON MODIFY
       IMPORTING keys FOR Shipment~on_create.
 
-    METHODS on_save_customer FOR DETERMINE ON SAVE
-      IMPORTING keys FOR Shipment~on_save_customer.
-
     METHODS on_modify_customer FOR DETERMINE ON MODIFY
       IMPORTING keys FOR Shipment~on_modify_customer.
 
@@ -41,28 +38,30 @@ CLASS lhc_shipment DEFINITION INHERITING FROM cl_abap_behavior_handler.
     METHODS create_eci FOR MODIFY
       IMPORTING keys FOR ACTION Shipment~create_eci.
 
-
-
 ******** Internal Methods *********
 
     METHODS get_texts_internal
-      IMPORTING VALUE(i_customer)               TYPE string
-                VALUE(i_sales_organization)     TYPE string
-                VALUE(i_distribution_channel)   TYPE string
-                VALUE(i_division)               TYPE string
-                VALUE(i_language)               TYPE string
-                VALUE(i_long_text_id)           TYPE string
-      RETURNING VALUE(o_text)                   TYPE string.
+      IMPORTING VALUE(i_customer)                       TYPE string
+                VALUE(i_sales_organization)             TYPE string
+                VALUE(i_distribution_channel)           TYPE string
+                VALUE(i_division)                       TYPE string
+                VALUE(i_language)                       TYPE string
+                VALUE(i_long_text_id)                   TYPE string
+      RETURNING VALUE(o_text)                           TYPE string.
 
     METHODS get_address_internal
-      IMPORTING VALUE(i_customer)               TYPE string
-      EXPORTING VALUE(o_street_name)            TYPE string
-                VALUE(o_house_number)           TYPE string.
+      IMPORTING VALUE(i_customer)                       TYPE string
+      EXPORTING VALUE(o_street_name)                    TYPE string
+                VALUE(o_house_number)                   TYPE string.
 
     METHODS get_forwarding_rule_internal
       IMPORTING VALUE(i_forwarding_rule_id)             TYPE string
       EXPORTING VALUE(o_transportation_type_shipment)   TYPE string
                 VALUE(o_freight_forwarder_client)       TYPE string.
+
+    METHODS get_components_internal
+      IMPORTING VALUE(i_product)                        TYPE string
+      EXPORTING VALUE(o_components)                     TYPE string.
 
 ENDCLASS. " lhc_shipment DEFINITION
 
@@ -310,8 +309,55 @@ CLASS lhc_shipment IMPLEMENTATION.
 
   METHOD create_invoice. " on Create Invoice
 
+*   Header
+    DATA BEGIN OF header.
+
+        DATA ID                     TYPE string.
+        DATA CreationDate           TYPE string.
+        DATA TotalCurrencyCode      TYPE string.
+        DATA TotalQuantity          TYPE string.
+        DATA TotalListPrice         TYPE string.
+        DATA TotalDiscount          TYPE string.
+        DATA TotalMainPrice         TYPE string.
+
+*       Postal Address
+        DATA StreetName             TYPE string.
+        DATA HouseID                TYPE string.
+        DATA CityName               TYPE string.
+        DATA CountryCode            TYPE string.
+        DATA StreetPostalCode       TYPE string.
+        DATA DateOfIssue            TYPE string.
+        DATA CurrencyCode           TYPE string.
+
+*       Name
+        DATA FirstLineName          TYPE string.
+        DATA SecondLineName         TYPE string.
+        DATA ThirdLineName          TYPE string.
+        DATA FourthLineName         TYPE string.
+
+*       Formatted Address
+        DATA FirstLineDescription   TYPE string.
+        DATA ThirdLineDescription   TYPE string.
+
+    DATA END OF header.
+
+*   Item
+    DATA BEGIN OF item.
+        DATA MaterialCup                TYPE string.
+        DATA Description                TYPE string.
+        DATA MaterialColor              TYPE string.
+        DATA MaterialQuantity           TYPE string.
+        DATA MatierialID                TYPE string.
+        DATA MaterialPrice              TYPE string.
+        DATA MaterialDiscountPercent    TYPE string. " '51%'
+        DATA CountryOfOrigin            TYPE string.
+    DATA END OF item.
+    DATA it_item LIKE TABLE OF item.
+
 *   Outbound (PDF)
     DATA it_outbound_create TYPE TABLE FOR CREATE zi_shipment_003\_Outbound.
+
+    DATA pricingElement TYPE I_BillingDocumentItemPrcgElmnt.
 
     " Read transfered instances
     READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
@@ -326,6 +372,309 @@ CLASS lhc_shipment IMPLEMENTATION.
         ENDIF.
         IF ( <entity>-%is_draft = '01' ). " Draft
         ENDIF.
+
+        TRY.
+            " Retrive XDP template from our Web Repository
+            SELECT SINGLE * FROM zi_repository_003 WHERE ( RepositoryID = 'INVOICE' ) INTO @DATA(repository).
+            IF (  sy-subrc = 0 ).
+
+*               Currency Code (default for the Shipment Group)
+                DATA(partyID) = |{ <entity>-PartyID ALPHA = IN }|.
+                SELECT SINGLE
+                        *
+                    FROM
+                        I_CustomerSalesArea
+                    WHERE
+                        ( Customer              = @partyID )  AND
+                        ( SalesOrganization     = '1000' ) AND
+                        ( DistributionChannel   = '10' ) AND
+                        ( Division              = '00' )
+                    INTO
+                        @DATA(customersalesarea).
+
+*               Creation Date
+                DATA formatted_date TYPE string.
+                cl_abap_datfm=>conv_date_int_to_ext(
+                  EXPORTING
+                    im_datint    = cl_abap_context_info=>get_system_date( )
+*                    im_datfmdes  =
+                  IMPORTING
+                    ex_datext    = formatted_date " 04.01.2024
+*                    ex_datfmused =
+                ).
+
+*               Header
+                header-ID                   = 'ISB-' && <entity>-ShipmentID. " 'ISB-1000000059'.
+                header-CreationDate         = formatted_date.
+                header-TotalCurrencyCode    = customersalesarea-Currency.
+                header-TotalQuantity        = ''.
+                header-TotalListPrice       = ''.
+                header-TotalDiscount        = ''.
+                header-TotalMainPrice       = ''.
+
+*               Name
+                header-FirstLineName        = <entity>-OrganisationFormattedName1.                      " PIU BIU " SKLEP Z BIELIZNA
+                header-SecondLineName       = |{ <entity>-StreetName } { <entity>-HouseID }|.           " Plac Bankowy 4 VA BANK
+                header-ThirdLineName        = |{ <entity>-StreetPostalCode } { <entity>-CityName }|.    " 00-095 WARSZAWA
+                header-FourthLineName       = <entity>-CountryCode. " Poland
+
+*               Postal Address
+                header-StreetName           = ''.
+                header-HouseID              = ''.
+                header-CityName             = ''.
+                header-CountryCode          = ''.
+                header-StreetPostalCode     = ''.
+                header-DateOfIssue          = ''.
+                header-CurrencyCode         = ''.
+
+*               Formatted Address
+                header-FirstLineDescription = ''.
+                header-ThirdLineDescription = ''.
+
+*               Item sections:
+                READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+                    ENTITY Shipment BY \_Available
+                    ALL FIELDS WITH VALUE #( (
+                        %tky = <entity>-%tky
+                    ) )
+                    RESULT DATA(it_available)
+                    FAILED DATA(failed1)
+                    REPORTED DATA(reported1).
+
+                SORT it_available STABLE BY AvailableID.
+
+                DATA quantity  TYPE I_BillingDocumentItem-BillingQuantity.
+                DATA listPrice TYPE I_BillingDocumentItem-NetAmount.
+                DATA discount  TYPE I_BillingDocumentItem-NetAmount.
+                DATA mainPrice TYPE I_BillingDocumentItem-NetAmount.
+
+                DATA totalQuantity  TYPE I_BillingDocumentItem-BillingQuantity  VALUE 0.
+                DATA totalListPrice TYPE I_BillingDocumentItem-NetAmount        VALUE 0.
+                DATA totalDiscount  TYPE I_BillingDocumentItem-NetAmount        VALUE 0.
+                DATA totalMainPrice TYPE I_BillingDocumentItem-NetAmount        VALUE 0.
+
+                LOOP AT it_available INTO DATA(available).
+
+                    available-OutboundDelivery = |{ available-OutboundDelivery ALPHA = IN }|.
+
+                    SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @available-OutboundDelivery ) INTO        @DATA(outbounddelivery).
+                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @available-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
+
+                    LOOP AT it_outbounddeliveryitem INTO DATA(outbounddeliveryitem).
+
+                        SELECT SINGLE * FROM I_BillingDocumentItem  WHERE ( ReferenceSDDocument  = @outbounddeliveryitem-OutboundDelivery ) AND ( ReferenceSDDocumentItem = @outbounddeliveryitem-OutboundDeliveryItem ) INTO @DATA(billingdocumentitem).
+                        SELECT SINGLE * FROM I_BillingDocument      WHERE ( BillingDocument      = @billingdocumentitem-BillingDocument ) INTO @DATA(billingdocument).
+
+                        IF ( billingdocumentitem IS INITIAL ).
+*                           Short format message
+*                           CONCATENATE 'Missing Invoice for Outbound Delivery' outbounddeliveryitem-OutboundDelivery '/' outbounddeliveryitem-OutboundDeliveryItem INTO DATA(text) SEPARATED BY space.
+*                           APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = text ) ) TO reported-shipment.
+*                           Long format message
+                            DATA(severity)  = if_abap_behv_message=>severity-error.
+                            DATA msgno TYPE sy-msgno VALUE '001'.
+                            DATA msgid TYPE sy-msgid VALUE 'Z_SHIPMENT_003'.
+                            DATA(msgty)     = 'E'.
+                            DATA(msgv1)     = 'Missing Invoice for Outbound Delivery'.
+                            DATA(msgv2)     = outbounddeliveryitem-OutboundDelivery.
+                            DATA(msgv3)     = '/'.
+                            DATA(msgv4)     = outbounddeliveryitem-OutboundDeliveryItem.
+                            APPEND VALUE #( %key = <entity>-%key %msg = new_message( severity = severity id = msgid number = msgno v1 = msgv1 v2 = msgv2 v3 = msgv3 v4 = msgv4 ) ) TO reported-shipment.
+                            RETURN.
+                        ENDIF.
+
+*                       Product
+                        "SELECT SINGLE * FROM I_Product WHERE ( Product = @billingdocumentitem-Product ) INTO @DATA(product).
+
+*                       Product -> Model/Color/Cupsize/Backsize
+                        SPLIT billingdocumentitem-Product AT '-' INTO DATA(model) DATA(color) DATA(cupsize) DATA(backsize).
+
+*                       Color Description
+                        SELECT SINGLE zi_color_005~Description FROM zi_color_005 WHERE ( ColorID = @color ) INTO @DATA(colorDescription).
+
+*                       Discount (from PricingElement)
+                        CLEAR pricingElement.
+                        SELECT SINGLE
+                                *
+                            FROM
+                                I_BillingDocumentItem\_PricingElement as PricingElement
+                            WHERE
+                                ( BillingDocument     = @billingdocumentitem-BillingDocument        ) AND
+                                ( BillingDocumentItem = @billingdocumentitem-BillingDocumentItem    ) AND
+                                ( ConditionType = 'DRG1' )
+                            INTO
+                                @pricingElement.
+
+                        quantity  = ( billingdocumentitem-BillingQuantity ).
+                        mainPrice = ( billingdocumentitem-NetAmount ).
+                        discount  = ( pricingElement-ConditionAmount ). " negative value
+                        listPrice = ( billingdocumentitem-NetAmount - pricingElement-ConditionAmount ).
+
+*                       Item:
+                        CLEAR item.
+                        item-MaterialCup                = cupsize.
+                        item-Description                = billingdocumentitem-BillingDocumentItemText.
+                        item-MaterialColor              = colorDescription.
+                        item-MaterialQuantity           = |{ billingdocumentitem-BillingQuantity DECIMALS = 1 }|.
+                        item-MatierialID                = |{ billingdocumentitem-Product ALPHA = IN }|.
+                        item-MaterialPrice              = |{ listPrice DECIMALS = 2 }|.
+                        item-MaterialDiscountPercent    = |{ pricingElement-ConditionRateValue }|. " '51%'
+                        item-CountryOfOrigin            = billingdocumentitem-CountryOfOrigin.
+                        APPEND item TO it_item.
+
+                        totalQuantity   = totalQuantity     + ( quantity ).
+                        totalListPrice  = totalListPrice    + ( listPrice ).
+                        totalDiscount   = totalDiscount     + ( discount ).
+                        totalMainPrice  = totalMainPrice    + ( mainPrice ).
+
+                    ENDLOOP.
+
+                ENDLOOP.
+
+                header-TotalQuantity        = |{ totalQuantity  DECIMALS = 1 }|.
+                header-TotalListPrice       = |{ totalListPrice DECIMALS = 2 }|.
+                header-TotalDiscount        = |{ totalDiscount  DECIMALS = 2 }|.
+                header-TotalMainPrice       = |{ totalMainPrice DECIMALS = 2 }|.
+
+*               Generate XML
+                DATA xml_data TYPE string VALUE ''.
+
+*               Header Section
+                xml_data = xml_data &&
+                    '<?xml version="1.0" encoding="UTF-8"?>' && cl_abap_char_utilities=>cr_lf &&
+                    '<InvoiceShipmentBindingForm>' && cl_abap_char_utilities=>cr_lf &&
+                    '<InvoiceShipmentBinding>' && cl_abap_char_utilities=>cr_lf &&
+
+                    '<ID>' && header-ID && '</ID>' && cl_abap_char_utilities=>cr_lf && " ISB-100062
+                    '<CreationDate>' && header-CreationDate && '</CreationDate>' && cl_abap_char_utilities=>cr_lf && " '2024-01-09'
+                    '<TotalCurrencyCode>' && header-TotalCurrencyCode && '</TotalCurrencyCode>' && cl_abap_char_utilities=>cr_lf && " 'EUR'
+                    '<TotalQuantity unitCode="">' && header-TotalQuantity && '</TotalQuantity>' && cl_abap_char_utilities=>cr_lf && " '149.00'
+                    '<TotalListPrice currencyCode="">' && header-TotalListPrice && '</TotalListPrice>' && cl_abap_char_utilities=>cr_lf && " '3074.45'
+                    '<TotalDiscount currencyCode="">' && header-TotalDiscount && '</TotalDiscount>' && cl_abap_char_utilities=>cr_lf &&
+                    '<TotalMainPrice currencyCode="">' && header-TotalMainPrice && '</TotalMainPrice>' && cl_abap_char_utilities=>cr_lf && " '3074.45'
+
+                    '<ToShipmentBinding>' && cl_abap_char_utilities=>cr_lf &&
+                    '<ToImportInvoiceRecipient>' && cl_abap_char_utilities=>cr_lf &&
+                    '<AddressSnapshot>' && cl_abap_char_utilities=>cr_lf &&
+                    '<Name>' && cl_abap_char_utilities=>cr_lf &&
+                    '<Name>' && cl_abap_char_utilities=>cr_lf &&
+                    '<FirstLineName>' && header-FirstLineName && '</FirstLineName>' && cl_abap_char_utilities=>cr_lf && " 'PIU BIU " SKLEP Z BIELIZNA'
+                    '<SecondLineName>' && header-SecondLineName && '</SecondLineName>' && cl_abap_char_utilities=>cr_lf && " 'Plac Bankowy 4 VA BANK'
+                    '<ThirdLineName>' && header-ThirdLineName && '</ThirdLineName>' && cl_abap_char_utilities=>cr_lf && " '00-095 WARSZAWA'
+                    '<FourthLineName>' && header-FourthLineName && '</FourthLineName>' && cl_abap_char_utilities=>cr_lf && " 'Poland'
+                    '</Name>' && cl_abap_char_utilities=>cr_lf &&
+                    '</Name>' && cl_abap_char_utilities=>cr_lf &&
+                    '<PostalAddress>' && cl_abap_char_utilities=>cr_lf &&
+                    '<CityName>' && header-CityName && '</CityName>' && cl_abap_char_utilities=>cr_lf &&
+                    '<StreetPostalCode>' && header-StreetPostalCode && '</StreetPostalCode>' && cl_abap_char_utilities=>cr_lf &&
+                    '<StreetName>' && header-StreetName && '</StreetName>' && cl_abap_char_utilities=>cr_lf &&
+                    '<HouseID>' && header-HouseID && '</HouseID>' && cl_abap_char_utilities=>cr_lf &&
+                    '</PostalAddress>' && cl_abap_char_utilities=>cr_lf &&
+                    '<PostalAddress>' && cl_abap_char_utilities=>cr_lf &&
+                    '<HouseID>' && header-HouseID && '</HouseID>' && cl_abap_char_utilities=>cr_lf &&
+                    '</PostalAddress>' && cl_abap_char_utilities=>cr_lf &&
+                    '<FormattedAddress>' && cl_abap_char_utilities=>cr_lf &&
+                    '<FormattedPostalAddress>' && cl_abap_char_utilities=>cr_lf &&
+                    '<FirstLineDescription>' && header-FirstLineDescription && '</FirstLineDescription>' && cl_abap_char_utilities=>cr_lf &&
+                    '<ThirdLineDescription>' && header-ThirdLineDescription && '</ThirdLineDescription>' && cl_abap_char_utilities=>cr_lf &&
+                    '</FormattedPostalAddress>' && cl_abap_char_utilities=>cr_lf &&
+                    '</FormattedAddress>' && cl_abap_char_utilities=>cr_lf &&
+                    '</AddressSnapshot>' && cl_abap_char_utilities=>cr_lf &&
+                    '</ToImportInvoiceRecipient>' && cl_abap_char_utilities=>cr_lf &&
+                    '</ToShipmentBinding>' && cl_abap_char_utilities=>cr_lf.
+
+*               Item Section
+                LOOP AT it_item INTO item.
+                    xml_data = xml_data &&
+                        '<Items>' && cl_abap_char_utilities=>cr_lf &&
+                        '<MaterialCup>' && item-MaterialCup && '</MaterialCup>' && cl_abap_char_utilities=>cr_lf && " 'C'
+                        '<Description languageCode="">' && item-Description && '</Description>' && cl_abap_char_utilities=>cr_lf && " 'Moments - Bügel-BH'
+                        '<MaterialColor>' && item-MaterialColor && '</MaterialColor>' && cl_abap_char_utilities=>cr_lf && " 'white'
+                        '<MaterialQuantity unitCode="">' && item-MaterialQuantity && '</MaterialQuantity>' && cl_abap_char_utilities=>cr_lf && " '1.00'
+                        '<MatierialID schemeAgencyID="" schemeID="">' && item-MatierialID && '</MatierialID>' && cl_abap_char_utilities=>cr_lf && " '000519'
+                        '<MaterialPrice currencyCode="">' && item-MaterialPrice && '</MaterialPrice>' && cl_abap_char_utilities=>cr_lf && " '18.90'
+                        '<MaterialDiscountPercent>' && item-MaterialDiscountPercent && '</MaterialDiscountPercent>' && cl_abap_char_utilities=>cr_lf &&
+                        '<CountryOfOrigin>' && item-CountryOfOrigin && '</CountryOfOrigin>' && cl_abap_char_utilities=>cr_lf && " 'MA'
+                        '</Items>' && cl_abap_char_utilities=>cr_lf.
+                ENDLOOP.
+
+                xml_data = xml_data &&
+                    '</InvoiceShipmentBinding>' && cl_abap_char_utilities=>cr_lf &&
+                    '</InvoiceShipmentBindingForm>'.
+
+*               Fix some 'harmful' characters
+                REPLACE ALL OCCURRENCES OF '&' IN xml_data WITH '&amp;'.
+
+                DATA lv_xml_data        TYPE xstring.
+                DATA lv_xdp             TYPE xstring.
+                DATA ls_options         TYPE cl_fp_ads_util=>ty_gs_options_pdf.
+                DATA ev_pdf             TYPE xstring.
+                DATA ev_pages           TYPE int4.
+                DATA ev_trace_string    TYPE string.
+
+                lv_xml_data = cl_abap_message_digest=>string_to_xstring( xml_data ).
+
+*               XDP - Xstring (binary) format
+                lv_xdp = repository-xdp. " cl_abap_message_digest=>string_to_xstring( text ). "
+
+*               Render PDF
+                cl_fp_ads_util=>render_pdf(
+                    EXPORTING iv_xml_data      = lv_xml_data
+                              iv_xdp_layout    = lv_xdp
+                              iv_locale        = 'de_DE'
+*                              iv_locale        = 'en_EN'
+                              is_options       = ls_options
+                    IMPORTING ev_pdf           = ev_pdf
+                              ev_pages         = ev_pages
+                              ev_trace_string  = ev_trace_string
+                ).
+
+                IF ( sy-subrc = 0 ).
+
+*                   Convert Xstring (binary) into Base64 (string) (for testing)
+                    DATA(base64_pdf) = cl_web_http_utility=>encode_x_base64( ev_pdf ).
+
+                    DATA(filename) = repository-RepositoryID && '_' && <entity>-ShipmentID && '.PDF'.
+                    DATA(mimetype) = 'application/pdf'.
+
+*                   Add a New Outbound
+                    APPEND VALUE #(
+                        %is_draft   = <entity>-%is_draft
+                        ShipmentUUID = <entity>-ShipmentUUID
+                        %target = VALUE #( (
+                            %is_draft       = <entity>-%is_draft
+                            %cid            = '1'
+                            ShipmentUUID    = <entity>-ShipmentUUID
+                            Attachment      = ev_pdf
+                            FileName        = filename
+                            MimeType        = mimetype
+                        ) )
+                    ) TO it_outbound_create.
+
+                    " Create New Items
+                    MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+                        ENTITY Shipment
+                        CREATE BY \_Outbound
+                        FIELDS ( ShipmentUUID Attachment FileName MimeType )
+                        WITH it_outbound_create
+                        FAILED DATA(failed2)
+                        MAPPED DATA(mapped2)
+                        REPORTED DATA(reported2).
+
+                ENDIF.
+
+
+            ENDIF.
+
+        CATCH cx_abap_datfm_format_unknown.
+            "handle exception
+        CATCH cx_abap_message_digest.
+            "handle exception
+        CATCH cx_fp_ads_util INTO DATA(fp_ads_util).
+            "handle exception
+            RAISE SHORTDUMP fp_ads_util.
+            APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'Rendering PDF error.' ) ) TO reported-shipment.
+            RETURN.
+        ENDTRY.
 
     ENDLOOP.
 
@@ -333,6 +682,37 @@ CLASS lhc_shipment IMPLEMENTATION.
 
   METHOD create_tkz_list. " on Create TKZ List
 
+*   Header
+    DATA BEGIN OF header.
+        DATA ID                             TYPE string.
+        DATA TKZNumber                      TYPE string.
+        DATA ShipmentID                     TYPE string.
+        DATA CreationDate                   TYPE string.
+        DATA InvoiceRecipient               TYPE string.
+        DATA InvoiceRecipientName           TYPE string.
+        DATA CustomerInvoiceListAsString    TYPE string.
+    DATA END OF header.
+
+*   Item
+    DATA BEGIN OF item.
+        DATA ID                     TYPE string.
+        DATA ItemID                 TYPE string.
+        DATA SiteLogisticsRequestID TYPE string.
+        DATA MaterialCup            TYPE string.
+        DATA MaterialComposition    TYPE string.
+        DATA MatierialID            TYPE string.
+        DATA MaterialQuantity       TYPE string.
+        DATA OutboundDeliveryID     TYPE string.
+    DATA END OF item.
+    DATA it_item LIKE TABLE OF item.
+
+*   Invoice
+    DATA BEGIN OF invoice.
+        DATA InvoiceDocumentID      TYPE string.
+        DATA InvoiceQuantity        TYPE string.
+    DATA END OF invoice.
+    DATA it_invoice LIKE TABLE OF invoice.
+
 *   Outbound (PDF)
     DATA it_outbound_create TYPE TABLE FOR CREATE zi_shipment_003\_Outbound.
 
@@ -349,6 +729,301 @@ CLASS lhc_shipment IMPLEMENTATION.
         ENDIF.
         IF ( <entity>-%is_draft = '01' ). " Draft
         ENDIF.
+
+        TRY.
+            " Retrive XDP template from our Web Repository
+            SELECT SINGLE * FROM zi_repository_003 WHERE ( RepositoryID = 'TKZ_LIST' ) INTO @DATA(repository).
+            IF (  sy-subrc = 0 ).
+
+                DATA(partyID) = |{ <entity>-PartyID ALPHA = IN }|.
+
+*               Customer
+                SELECT SINGLE * FROM I_Customer WHERE ( Customer = @partyID ) INTO @DATA(customer).
+
+*               Currency Code (default for the Shipment Group)
+                SELECT SINGLE
+                        *
+                    FROM
+                        I_CustomerSalesArea
+                    WHERE
+                        ( Customer              = @partyID )  AND
+                        ( SalesOrganization     = '1000' ) AND
+                        ( DistributionChannel   = '10' ) AND
+                        ( Division              = '00' )
+                    INTO
+                        @DATA(customersalesarea).
+
+*                DATA formatted_date TYPE string.
+*                cl_abap_datfm=>conv_date_int_to_ext(
+*                  EXPORTING
+*                    im_datint    = cl_abap_context_info=>get_system_date( )
+**                    im_datfmdes
+*                  IMPORTING
+*                    ex_datext    = formatted_date " 04.01.2024
+**                    ex_datfmused =
+*                ).
+
+*               Header
+                header-ID                           = |{ <entity>-ShipmentID ALPHA = OUT }|. " '1000000059'.
+                header-TKZNumber                    = |{ <entity>-ShipmentID ALPHA = OUT }|.
+                header-ShipmentID                   = |{ <entity>-ShipmentID ALPHA = OUT }|. " '1000000059'.
+                header-CreationDate                 = cl_abap_context_info=>get_system_date( ).
+                header-InvoiceRecipient             = |{ partyID ALPHA = OUT }|.
+                header-InvoiceRecipientName         = customer-BPCustomerName.
+                header-CustomerInvoiceListAsString  = ''.
+
+*               Item and Invoice sections:
+                READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+                    ENTITY Shipment BY \_Available
+                    ALL FIELDS WITH VALUE #( (
+                        %tky = <entity>-%tky
+                    ) )
+                    RESULT DATA(it_available)
+                    FAILED DATA(failed1)
+                    REPORTED DATA(reported1).
+
+                DATA(count) = 0.
+
+                LOOP AT it_available INTO DATA(available).
+
+                    available-OutboundDelivery = |{ available-OutboundDelivery ALPHA = IN }|.
+
+                    SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @available-OutboundDelivery ) INTO        @DATA(outbounddelivery).
+                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @available-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
+
+                    LOOP AT it_outbounddeliveryitem INTO DATA(outbounddeliveryitem).
+
+                        SELECT SINGLE * FROM I_BillingDocumentItem  WHERE ( ReferenceSDDocument  = @outbounddeliveryitem-OutboundDelivery ) AND ( ReferenceSDDocumentItem = @outbounddeliveryitem-OutboundDeliveryItem ) INTO @DATA(billingdocumentitem).
+                        SELECT SINGLE * FROM I_BillingDocument      WHERE ( BillingDocument      = @billingdocumentitem-BillingDocument ) INTO @DATA(billingdocument).
+
+                        IF ( billingdocumentitem IS INITIAL ).
+*                           Short format message
+*                           CONCATENATE 'Missing Invoice for Outbound Delivery' outbounddeliveryitem-OutboundDelivery '/' outbounddeliveryitem-OutboundDeliveryItem INTO DATA(text) SEPARATED BY space.
+*                           APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = text ) ) TO reported-shipment.
+*                           Long format message
+                            DATA(severity)  = if_abap_behv_message=>severity-error.
+                            DATA msgno TYPE sy-msgno VALUE '001'.
+                            DATA msgid TYPE sy-msgid VALUE 'Z_SHIPMENT_003'.
+                            DATA(msgty)     = 'E'.
+                            DATA(msgv1)     = 'Missing Invoice for Outbound Delivery'.
+                            DATA(msgv2)     = outbounddeliveryitem-OutboundDelivery.
+                            DATA(msgv3)     = '/'.
+                            DATA(msgv4)     = outbounddeliveryitem-OutboundDeliveryItem.
+                            APPEND VALUE #( %key = <entity>-%key %msg = new_message( severity = severity id = msgid number = msgno v1 = msgv1 v2 = msgv2 v3 = msgv3 v4 = msgv4 ) ) TO reported-shipment.
+                            RETURN.
+                        ENDIF.
+
+*                       Product
+                        SELECT SINGLE * FROM I_Product  WHERE ( Product = @billingdocumentitem-Product ) INTO @DATA(product).
+
+**                       Date Of Invoice
+*                        DATA dateOfInvoice TYPE string.
+*                        cl_abap_datfm=>conv_date_int_to_ext(
+*                          EXPORTING
+*                            im_datint    = billingdocument-billingdocumentdate
+**                            im_datfmdes  =
+*                          IMPORTING
+*                            ex_datext    = dateOfInvoice " 04.01.2024
+**                            ex_datfmused =
+*                        ).
+
+*                       Material Quantity
+                        DATA materialQuantity TYPE string.
+                        materialQuantity    = |{ billingdocumentitem-BillingQuantity    DECIMALS = 1 }|.
+
+                        SPLIT billingdocumentitem-Product AT '-' INTO DATA(model) DATA(color) DATA(capsize) DATA(backsize).
+
+*                       Material Composition
+                        DATA material_composition TYPE string.
+                        get_components_internal(
+                          EXPORTING
+                            i_product    = CONV string( billingdocumentitem-Product )
+                          IMPORTING
+                            o_components = material_composition
+                        ).
+
+                        count = count + 1.
+
+*                       Item:
+                        CLEAR item.
+                        item-ID                     = count.
+                        item-ItemID                 = model.
+                        item-SiteLogisticsRequestID = outbounddelivery-ShippingPoint.
+                        item-MaterialCup            = capsize.
+                        item-MaterialComposition    = material_composition. " 'material composition'.
+                        item-MatierialID            = billingdocumentitem-Product.
+                        item-MaterialQuantity       = materialQuantity. " '1.0'.
+                        item-OutboundDeliveryID     = outbounddeliveryitem-OutboundDelivery. "
+                        APPEND item TO it_item.
+
+*                       Invoice:
+                        CLEAR invoice.
+                        invoice-InvoiceDocumentID   = |{ billingdocumentitem-BillingDocument ALPHA = OUT }|. " '80000000'.
+                        invoice-InvoiceQuantity     = materialQuantity. " '1'.
+                        APPEND invoice TO it_invoice.
+
+                    ENDLOOP.
+                ENDLOOP.
+
+*               Group it_item By MatierialID
+                SORT it_item STABLE BY ItemID MatierialID.
+                DATA it_item2 LIKE it_item.
+                DATA item2 LIKE item.
+                CLEAR item2.
+                LOOP AT it_item INTO item.
+                    IF ( item-ItemID = item2-ItemID ) AND
+                       ( sy-tabix <> 1 ).
+                        item2-MaterialQuantity  = |{ 0  + item2-MaterialQuantity + item-MaterialQuantity DECIMALS = 1 }|.
+                        IF ( item2-MaterialCup NS item-MaterialCup ).
+                            IF ( item2-MaterialCup IS NOT INITIAL ).
+                                item2-MaterialCup = item2-MaterialCup && ','.
+                            ENDIF.
+                            item2-MaterialCup = item2-MaterialCup && item-MaterialCup.
+                        ENDIF.
+                    ELSE.
+                        IF ( sy-tabix <> 1 ).
+                            APPEND item2 TO it_item2.
+                        ENDIF.
+                        MOVE-CORRESPONDING item to item2.
+                    ENDIF.
+                ENDLOOP.
+                IF ( item2 IS NOT INITIAL ).
+                    APPEND item2 TO it_item2.
+                ENDIF.
+
+*               Group it_invoice By CustomerInvoiceID
+                SORT it_invoice STABLE BY InvoiceDocumentID.
+                DATA it_invoice2 LIKE it_invoice.
+                DATA invoice2 LIKE invoice.
+                CLEAR invoice2.
+                LOOP AT it_invoice INTO invoice.
+                    IF ( invoice-InvoiceDocumentID = invoice2-InvoiceDocumentID ) AND
+                       ( sy-tabix <> 1 ).
+                        invoice2-InvoiceQuantity  = |{ 0 + invoice2-InvoiceQuantity  + invoice-InvoiceQuantity DECIMALS = 1 }|.
+                    ELSE.
+                        IF ( sy-tabix <> 1 ).
+                            APPEND invoice2 TO it_invoice2.
+                        ENDIF.
+                        MOVE-CORRESPONDING invoice to invoice2.
+                    ENDIF.
+                ENDLOOP.
+                IF ( invoice2 IS NOT INITIAL ).
+                    APPEND invoice2 TO it_invoice2.
+                ENDIF.
+
+*               Generate XML
+                DATA xml_data TYPE string VALUE ''.
+
+                xml_data = xml_data &&
+                    '<?xml version="1.0" encoding="UTF-8"?>' && cl_abap_char_utilities=>cr_lf &&
+                    '<TKZListForm>' && cl_abap_char_utilities=>cr_lf &&
+                    '<TKZList>' && cl_abap_char_utilities=>cr_lf.
+
+*               Header Section
+                xml_data = xml_data &&
+                    '<ID>' && header-ID && '</ID>' && cl_abap_char_utilities=>cr_lf &&
+                    '<TKZNumber>' && header-TKZNumber && '</TKZNumber>' && cl_abap_char_utilities=>cr_lf && " '100012'
+                    '<ShipmentID>' && header-ShipmentID && '</ShipmentID>' && cl_abap_char_utilities=>cr_lf &&
+                    '<CreationDate>' && header-CreationDate && '</CreationDate>' && cl_abap_char_utilities=>cr_lf &&
+                    '<InvoiceRecipient>' && header-InvoiceRecipient && '</InvoiceRecipient>' && cl_abap_char_utilities=>cr_lf &&
+                    '<InvoiceRecipientName>' && header-InvoiceRecipientName && '</InvoiceRecipientName>' && cl_abap_char_utilities=>cr_lf &&
+                    '<CustomerInvoiceListAsString>' && header-CustomerInvoiceListAsString && '</CustomerInvoiceListAsString>' && cl_abap_char_utilities=>cr_lf.
+
+*               Item Section
+                LOOP AT it_item2 INTO item2.
+                    xml_data = xml_data &&
+                        '<Items>' && cl_abap_char_utilities=>cr_lf &&
+                        '<ID>' && item2-ID && '</ID>' && cl_abap_char_utilities=>cr_lf &&
+                        '<ItemID>' && item2-ItemID && '</ItemID>' && cl_abap_char_utilities=>cr_lf &&
+                        '<SiteLogisticsRequestID>' && item2-SiteLogisticsRequestID && '</SiteLogisticsRequestID>' && cl_abap_char_utilities=>cr_lf &&
+                        '<MaterialCup>' && item2-MaterialCup && '</MaterialCup>' && cl_abap_char_utilities=>cr_lf &&
+                        '<MaterialComposition>' && item2-MaterialComposition && '</MaterialComposition>' && cl_abap_char_utilities=>cr_lf &&
+                        '<MatierialID>' && item2-MatierialID && '</MatierialID>' && cl_abap_char_utilities=>cr_lf &&
+                        '<MaterialQuantity>' && item2-MaterialQuantity && '</MaterialQuantity>' && cl_abap_char_utilities=>cr_lf &&
+                        '<OutboundDeliveryID>' && item2-OutboundDeliveryID && '</OutboundDeliveryID>' && cl_abap_char_utilities=>cr_lf &&
+                        '</Items>' && cl_abap_char_utilities=>cr_lf.
+                ENDLOOP.
+
+*               Invoice Section
+                LOOP AT it_invoice2 INTO invoice2.
+                    xml_data = xml_data &&
+                        '<InvoiceDocument>' && cl_abap_char_utilities=>cr_lf &&
+                        '<InvoiceDocumentID schemeAgencyID="" schemeAgencySchemeAgencyID="" schemeID="">' && invoice2-InvoiceDocumentID && '</InvoiceDocumentID>' && cl_abap_char_utilities=>cr_lf &&
+                        '<InvoiceQuantity>' && invoice2-InvoiceQuantity && '</InvoiceQuantity>' && cl_abap_char_utilities=>cr_lf &&
+                        '</InvoiceDocument>' && cl_abap_char_utilities=>cr_lf.
+                ENDLOOP.
+
+                xml_data = xml_data &&
+                    '</TKZList>' && cl_abap_char_utilities=>cr_lf &&
+                    '</TKZListForm>' && cl_abap_char_utilities=>cr_lf.
+
+*               Fix some 'harmful' characters
+                REPLACE ALL OCCURRENCES OF '&' IN xml_data WITH '&amp;'.
+
+                DATA lv_xml_data        TYPE xstring.
+                DATA lv_xdp             TYPE xstring.
+                DATA ls_options         TYPE cl_fp_ads_util=>ty_gs_options_pdf.
+                DATA ev_pdf             TYPE xstring.
+                DATA ev_pages           TYPE int4.
+                DATA ev_trace_string    TYPE string.
+
+                lv_xml_data = cl_abap_message_digest=>string_to_xstring( xml_data ).
+
+*               XDP - Xstring (binary) format
+                lv_xdp = repository-xdp. " cl_abap_message_digest=>string_to_xstring( text ). "
+
+*               Render PDF
+                cl_fp_ads_util=>render_pdf(
+                    EXPORTING iv_xml_data      = lv_xml_data
+                              iv_xdp_layout    = lv_xdp
+                              iv_locale        = 'de_DE'
+                              is_options       = ls_options
+                    IMPORTING ev_pdf           = ev_pdf
+                              ev_pages         = ev_pages
+                              ev_trace_string  = ev_trace_string
+                ).
+
+                IF ( sy-subrc = 0 ).
+
+*                   Convert Xstring (binary) into Base64 (string) (for testing)
+                    DATA(base64_pdf) = cl_web_http_utility=>encode_x_base64( ev_pdf ).
+
+                    DATA(filename) = repository-RepositoryID && '_' && <entity>-ShipmentID && '.PDF'.
+                    DATA(mimetype) = 'application/pdf'.
+
+*                   Add a New Outbound
+                    APPEND VALUE #(
+                        %is_draft   = <entity>-%is_draft
+                        ShipmentUUID = <entity>-ShipmentUUID
+                        %target = VALUE #( (
+                            %is_draft       = <entity>-%is_draft
+                            %cid            = '1'
+                            ShipmentUUID    = <entity>-ShipmentUUID
+                            Attachment      = ev_pdf
+                            FileName        = filename
+                            MimeType        = mimetype
+                        ) )
+                    ) TO it_outbound_create.
+
+                    " Create New Items
+                    MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+                        ENTITY Shipment
+                        CREATE BY \_Outbound
+                        FIELDS ( ShipmentUUID Attachment FileName MimeType )
+                        WITH it_outbound_create
+                        FAILED DATA(failed2)
+                        MAPPED DATA(mapped2)
+                        REPORTED DATA(reported2).
+
+                ENDIF.
+
+            ENDIF.
+
+        CATCH cx_abap_datfm_format_unknown.
+        CATCH cx_fp_ads_util.
+        CATCH cx_abap_message_digest.
+
+        ENDTRY.
 
     ENDLOOP.
 
@@ -668,7 +1343,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                     '</TariffDocument>' && cl_abap_char_utilities=>cr_lf &&
                     '</TariffDocumentForm>' && cl_abap_char_utilities=>cr_lf.
 
-*               Remove some 'harmful' characters
+*               Fix some 'harmful' characters
                 REPLACE ALL OCCURRENCES OF '&' IN xml_data WITH '&amp;'.
 
                 DATA lv_xml_data        TYPE xstring.
@@ -699,7 +1374,7 @@ CLASS lhc_shipment IMPLEMENTATION.
 *                   Convert Xstring (binary) into Base64 (string) (for testing)
                     DATA(base64_pdf) = cl_web_http_utility=>encode_x_base64( ev_pdf ).
 
-                    DATA(filename) = repository-RepositoryID && '_' && <entity>-ShipmentID.
+                    DATA(filename) = repository-RepositoryID && '_' && <entity>-ShipmentID && '.PDF'.
                     DATA(mimetype) = 'application/pdf'.
 
 *                   Add a New Outbound
@@ -741,7 +1416,7 @@ CLASS lhc_shipment IMPLEMENTATION.
 
   ENDMETHOD. " create_tariff_document
 
-  METHOD create_eci. " csv
+  METHOD create_eci. " on Create ECI
 
 *   Outbound (CSV)
     DATA it_outbound_create TYPE TABLE FOR CREATE zi_shipment_003\_Outbound.
@@ -759,6 +1434,117 @@ CLASS lhc_shipment IMPLEMENTATION.
         ENDIF.
         IF ( <entity>-%is_draft = '01' ). " Draft
         ENDIF.
+
+*       Item and Invoice sections:
+        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment BY \_Available
+            ALL FIELDS WITH VALUE #( (
+                %tky = <entity>-%tky
+            ) )
+            RESULT DATA(it_available)
+            FAILED DATA(failed1)
+            REPORTED DATA(reported1).
+
+        DATA body TYPE string VALUE ''.
+
+        body = body && 'Proveedor;Empresa Recepción;Lugar Recepción;Empresa Destino;Lugar destino;Uneco;Pedido;Albarán;Bultos;Embalaje;Transportista;Expedición' && cl_abap_char_utilities=>cr_lf.
+
+        LOOP AT it_available INTO DATA(available).
+
+            body = body && '1125518;1;'.
+            CASE <entity>-PartyID.  " Shipment Group (Sendungsgruppe)
+                WHEN 'ECI VALDEMORO MADRID'.
+                    body = body && '50;'.
+                WHEN 'ECI MONTORNES BARCELONA'.
+                    body = body && '62;'.
+                WHEN OTHERS.
+                    body = body && ';'.
+            ENDCASE.
+            body = body && '1;'.
+
+            IF ( 1 = 2 ).
+*               TODO
+*            IF ( <entity>-Response IS NOT INITIAL ).
+*            {
+*                var query = SalesOrder.QueryByElements;
+*                var selectionParams = query.CreateSelectionParams();
+*                selectionParams.Add(query.BuyerID.content, "I", "EQ", addedShipmentResponse.Response.ExternalReference);
+*                var resultData = query.Execute(selectionParams);
+*                var shopNumber : ID;
+*                foreach(var salesOrder in resultData)
+*                {
+*                    if(salesOrder.BuyerParty.IsSet())
+*                    {
+*                        if(salesOrder.BuyerParty.PartyKey.PartyID.content.Substring(0,5) == "ES101")
+*                        {
+*                            var addressInfo;
+*                            foreach(var i in salesOrder.BuyerParty.Party.Customer.AddressInformation)
+*                            {
+*                                if(i.AddressCurrentAddressDeterminationProcesses.IsSet())
+*                                {
+*                                    if(i.AddressCurrentAddressDeterminationProcesses.DefaultAddressDeterminationProcessRelevanceIndicator == true)
+*                                    {
+*                                        addressInfo = i;
+*                                    }
+*                                }
+*                            }
+*                            if(addressInfo.Address.IsSet())
+*                            {
+*                                if(addressInfo.Address.DefaultPostalAddressRepresentation.IsSet())
+*                                {
+*                                    shopNumber = addressInfo.Address.DefaultPostalAddressRepresentation.StreetPrefixName.Substring(0,3);
+*                                    shopNumber = shopNumber.RemoveLeadingZeros();
+*                                }
+*                            }
+*                            break;
+*                        }
+*                    }
+*
+*                }
+*                body = body + shopNumber + ";";
+*
+*                body = body + "110;";
+*                body = body + addedShipmentResponse.Response.ExternalReference + ";";
+*                body = body + addedShipmentResponse.Response.ODRequestID.RemoveLeadingZeros() + ";";
+*                body = body + addedShipmentResponse.Response.NumberOfPackages.RoundToString(0) + ";";
+*            }
+            ELSE.
+                body = body && ';100;;;;'.
+            ENDIF.
+            body = body && 'b;Senator;0'.
+            body = body && cl_abap_char_utilities=>cr_lf.
+
+        ENDLOOP.
+
+*       Convert string To Xstring (binary)
+        DATA(ev_csv) = cl_web_http_utility=>encode_utf8( body ).
+
+        DATA(filename) = 'ECI' && '_' && <entity>-ShipmentID && '.CSV'.
+        DATA(mimetype) = 'text/csv'.
+
+*       Add a New Outbound
+        APPEND VALUE #(
+            %is_draft   = <entity>-%is_draft
+            ShipmentUUID = <entity>-ShipmentUUID
+            %target = VALUE #( (
+                %is_draft       = <entity>-%is_draft
+                %cid            = '1'
+                ShipmentUUID    = <entity>-ShipmentUUID
+                Attachment      = ev_csv
+                FileName        = filename
+                MimeType        = mimetype
+            ) )
+        ) TO it_outbound_create.
+
+        " Create New Items
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment
+            CREATE BY \_Outbound
+            FIELDS ( ShipmentUUID Attachment FileName MimeType )
+            WITH it_outbound_create
+            FAILED DATA(failed2)
+            MAPPED DATA(mapped2)
+            REPORTED DATA(reported2).
 
     ENDLOOP.
 
@@ -779,29 +1565,12 @@ CLASS lhc_shipment IMPLEMENTATION.
 *        ENDIF.
 *        IF ( <entity>-%is_draft = '01' ). " Draft
 *        ENDIF.
-*
-**       Generate New Matrix ID (moved to Activate (Save) )
-*        DATA shipmentid TYPE zi_shipment_003-ShipmentID VALUE '0000000000'.
-*        SELECT MAX( shipmentid ) FROM zi_shipment_003 INTO (@shipmentid).
-*        shipmentid  = ( shipmentid + 1 ).
-*
-*        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
-*            ENTITY Shipment
-*            UPDATE FIELDS ( ShipmentID )
-*            WITH VALUE #( (
-*                %tky        = <entity>-%tky
-**                ShipmentID  = shipmentid
-*            ) )
-*            FAILED DATA(ls_failed1)
-*            MAPPED DATA(ls_mapped1)
-*            REPORTED DATA(ls_reported1).
-*
 *    ENDLOOP.
 
   ENDMETHOD. " on_create
 
-  METHOD on_save_customer.
-  ENDMETHOD. " on_save_customer
+*  METHOD on_save_customer.
+*  ENDMETHOD. " on_save_customer
 
   METHOD on_modify_customer.
 
@@ -831,8 +1600,8 @@ CLASS lhc_shipment IMPLEMENTATION.
                     PartyID
                 )
                 WITH VALUE #( (
-                    %tky    = <entity>-%tky
-                    PartyID = partyID
+                    %tky        = <entity>-%tky
+                    PartyID     = partyID
                 ) )
                 MAPPED DATA(mapped1)
                 FAILED DATA(failed1)
@@ -893,6 +1662,9 @@ CLASS lhc_shipment IMPLEMENTATION.
 
         ENDIF.
 
+*       Link to Party
+        DATA(partyURL) = |/ui#Customer-displayFactSheet?sap-ui-tech-hint=GUI&/C_CustomerOP('| && condense( val = |{ <entity>-PartyID ALPHA = OUT }| ) && |')|.
+
         MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
             ENTITY Shipment
             UPDATE FIELDS (
@@ -910,6 +1682,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                 TransportationType
                 FreightForwarderClient
                 Instructions
+                PartyURL
             )
             WITH VALUE #( (
                 %is_draft                   = <entity>-%is_draft
@@ -928,6 +1701,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                 TransportationType          = transportationTypeShipment
                 FreightForwarderClient      = freightForwarderClient
                 Instructions                = tx03
+                PartyURL                     = partyURL
             ) )
             MAPPED DATA(mapped2)
             FAILED DATA(failed2)
@@ -1177,6 +1951,28 @@ CLASS lhc_shipment IMPLEMENTATION.
 
   ENDMETHOD. " get_forwarding_rule_internal
 
+  METHOD get_components_internal. " * get components of material
+
+    o_components = ''.
+
+*   Item
+    SELECT * FROM I_BillOfMaterialItemTP_2 WHERE ( Material = @i_product ) INTO TABLE @DATA(it_billofmaterialitem).
+
+    IF ( sy-subrc = 0 ).
+        LOOP AT it_billofmaterialitem INTO DATA(billofmaterialitem).
+            DATA(componentDescription)          = billofmaterialitem-ComponentDescription.
+            DATA(billOfMaterialItemQuantity)    = |{ billofmaterialitem-BillOfMaterialItemQuantity DECIMALS = 0 }|.
+            DATA(billOfMaterialItemUnit)        = billofmaterialitem-BillOfMaterialItemUnit.
+            CONCATENATE componentDescription billOfMaterialItemQuantity billOfMaterialItemUnit INTO DATA(component) SEPARATED BY space.
+            IF ( o_components IS NOT INITIAL ).
+                o_components = o_components && cl_abap_char_utilities=>cr_lf.
+            ENDIF.
+            o_components = o_components  && component.
+        ENDLOOP.
+    ENDIF.
+
+  ENDMETHOD. " get_components_internal
+
 ENDCLASS. " lhc_shipment IMPLEMENTATION
 
 
@@ -1284,21 +2080,23 @@ CLASS lhc_available IMPLEMENTATION.
 
         IF ( outboundDelivery <> <entity>-OutboundDelivery ).
 
+*           Link to Outbound Delivery
+            DATA(outboundDeliveryURL) = |/ui#OutboundDelivery-displayFactSheet?sap-app-origin-hint=&/C_OutboundDeliveryFs('| && condense( val = |{ <entity>-OutboundDelivery ALPHA = OUT }| ) && |')|. " '80000000'
+
             MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
                 ENTITY Available
                 UPDATE FIELDS (
                     OutboundDelivery
+                    OutboundDeliveryURL
                 )
                 WITH VALUE #( (
-*                    %is_draft           = <entity>-%is_draft
-*                    AvailableUUID       = <entity>-AvailableUUID
                     %tky                = <entity>-%tky
-
                     OutboundDelivery    = outboundDelivery
+                    OutboundDeliveryURL = outboundDeliveryURL
                 ) )
-                MAPPED DATA(mapped2)
-                FAILED DATA(failed2)
-                REPORTED DATA(reported2).
+                MAPPED DATA(mapped1)
+                FAILED DATA(failed1)
+                REPORTED DATA(reported1).
 
         ENDIF.
 

@@ -2,7 +2,6 @@
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @Metadata.allowExtensions: true
 
-
 define root view entity ZC_REPOSITORY_003 provider contract transactional_query as projection on ZI_REPOSITORY_003
 {
     key RepositoryUUID,
@@ -20,6 +19,6 @@ define root view entity ZC_REPOSITORY_003 provider contract transactional_query 
     CreatedBy,
     CreatedAt,
     LastChangedBy,
-    LastChangedAt,
-    LocalLastChangedAt
+    LocalLastChangedAt,
+    LastChangedAt
 }

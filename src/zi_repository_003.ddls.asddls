@@ -38,9 +38,23 @@ define root view entity ZI_REPOSITORY_003 as select from zrepository003
     mimetype2 as MimeType2,
     filename2 as FileName2,
 
+    @Semantics.user.createdBy: true
     createdby as CreatedBy,
+
+    @Semantics.systemDateTime.createdAt: true
     createdat as CreatedAt,
+
+    @Semantics.user.lastChangedBy: true
     lastchangedby as LastChangedBy,
-    lastchangedat as LastChangedAt,
-    locallastchangedat as LocalLastChangedAt
+
+    //local ETag field --> OData ETag
+
+    @Semantics.systemDateTime.localInstanceLastChangedAt: true
+    locallastchangedat as LocalLastChangedAt,
+
+    //total ETag field
+
+    @Semantics.systemDateTime.lastChangedAt: true
+    lastchangedat as LastChangedAt
+
 }

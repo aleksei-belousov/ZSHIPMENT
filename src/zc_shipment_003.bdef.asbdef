@@ -22,7 +22,7 @@ define behavior for ZC_SHIPMENT_003 alias Shipment
   use action create_eci; // csv
 
   use association _Available { create; with draft;}
-  use association _Outbound { /*create;*/ with draft;}
+  use association _Outbound { create; with draft;}
 
 }
 

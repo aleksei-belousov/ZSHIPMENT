@@ -10,6 +10,7 @@ association [0..1] to I_DeliveryDocument as _DeliveryDocument on $projection.Out
     availableid as AvailableID,
     shipmentuuid as ShipmentUUID,
     outbounddelivery as OutboundDelivery,
+    outbounddeliveryurl as OutboundDeliveryURL,
 
     createdby as CreatedBy,
     createdat as Createdat,

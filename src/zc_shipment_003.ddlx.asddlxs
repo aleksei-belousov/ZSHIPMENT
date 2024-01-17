@@ -28,10 +28,10 @@ annotate entity ZC_SHIPMENT_003 with
             position:     20,
             targetElement: '_Available'
          },
-        // Outbound document
+        // Attachments
         {
             hidden:       false,
-            label:        'Outbound document',
+            label:        'Attachments',
             id:           'OutboundUUID',
             purpose:      #STANDARD,
             type:         #LINEITEM_REFERENCE,
@@ -49,7 +49,7 @@ annotate entity ZC_SHIPMENT_003 with
                               { type: #FOR_ACTION, dataAction: 'create_tkz_list',           label: 'Create TKZ List',       position: 2 },
                               { type: #FOR_ACTION, dataAction: 'create_tariff_document',    label: 'Create Tariff Document',position: 3 },
                               { type: #FOR_ACTION, dataAction: 'create_eci',                label: 'Create ECI csv',        position: 4 },
-                              { type: #FOR_ACTION, dataAction: 'release',                   label: 'Release',                position: 5 } ] }
+                              { type: #FOR_ACTION, dataAction: 'release',                   label: 'Release',               position: 5 } ] }
     ShipmentID;
 
     @UI: {  lineItem:       [ { position: 40, label: 'Sold To Party', cssDefault.width: '200px' } ],
@@ -65,8 +65,8 @@ annotate entity ZC_SHIPMENT_003 with
             identification: [ { position: 60, label: 'Confirmation Date' } ] }
     ConfirmationDate;
 
-    @UI: {  lineItem:       [ { position: 70, label: 'Shipment Group', cssDefault.width: '200px' } ],
-            identification: [ { position: 70, label: 'Shipment Group' } ] }
+    @UI: {  lineItem:       [ { position: 70, label: 'Shipment Group', cssDefault.width: '200px', type: #WITH_URL, url: 'PartyURL' } ],
+            identification: [ { position: 70, label: 'Shipment Group', type: #WITH_URL, url: 'PartyURL' } ] }
     PartyID;
 
     @UI: {  lineItem:       [ { position: 80, label: 'Tour', cssDefault.width: '200px' } ],
@@ -128,6 +128,9 @@ annotate entity ZC_SHIPMENT_003 with
     @UI: {  lineItem:       [ { position: 220, label: 'GLN', cssDefault.width: '200px' } ],
             identification: [ { position: 220, label: 'GLN' } ] }
     BPIdentificationNumber;
+
+    @UI.hidden: true
+    PartyURL;
 
     @UI.hidden: true
     CreatedBy;

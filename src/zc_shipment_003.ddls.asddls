@@ -36,6 +36,7 @@ define root view entity ZC_SHIPMENT_003 provider contract transactional_query as
     TaxJurisdictionCode,
     StreetPostalCode,
     Instructions, 
+    PartyURL,
     _BuPaIdentification.BPIdentificationNumber as BPIdentificationNumber,
     
     CreatedBy,

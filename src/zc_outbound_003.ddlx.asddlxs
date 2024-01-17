@@ -1,8 +1,8 @@
 @Metadata.layer: #CORE
 @UI: {
-    headerInfo: { typeName: 'Outbound docuemnt',
-                  typeNamePlural: 'Outbound document',
-                  title: { type: #STANDARD, label: 'Outbound document', value: 'OutboundUUID' } },
+    headerInfo: { typeName: 'Attachments',
+                  typeNamePlural: 'Attachments',
+                  title: { type: #STANDARD, label: 'Attachments', value: 'OutboundUUID' } },
     presentationVariant: [{ sortOrder: [{ by: 'OutboundUUID', direction: #ASC }] }] }
 //@Search.searchable: true
 
@@ -11,10 +11,10 @@ annotate entity ZC_OUTBOUND_003 with
 
     @UI.facet: [
         {
-            id:            'Outbound',
+            id:            'Attachments',
             purpose:       #STANDARD,
             type:          #IDENTIFICATION_REFERENCE,
-            label:         'Outbound document',
+            label:         'Attachments',
             position:      10
         }
     ]
@@ -22,8 +22,8 @@ annotate entity ZC_OUTBOUND_003 with
     @UI.hidden: true
     OutboundUUID;
 
-    @UI: {  lineItem:       [ { position: 10, label: 'Outbound ID', cssDefault.width: '100px' } ],
-            identification: [ { position: 10, label: 'Outbound ID' } ] }
+    @UI: {  lineItem:       [ { position: 10, label: 'ID', cssDefault.width: '100px' } ],
+            identification: [ { position: 10, label: 'ID' } ] }
     OutboundID;
 
     @UI.hidden: true

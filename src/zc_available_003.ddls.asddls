@@ -13,6 +13,7 @@ define view entity ZC_AVAILABLE_003 as projection on ZI_AVAILABLE_003 as Availab
     @EndUserText.label: 'Outbound Delivery'
     OutboundDelivery,
 
+    OutboundDeliveryURL,
     _DeliveryDocument.UnloadingPointName as UnloadingPointName,
     _Shipment.SoldToParty as SoldToParty, 
 

@@ -29,8 +29,8 @@ annotate entity ZC_AVAILABLE_003 with
     @UI.hidden: true
     ShipmentUUID;
 
-    @UI: {  lineItem:       [ { position: 20, label: 'Outbound Delivery', cssDefault.width: '100px' } ],
-            identification: [ { position: 20, label: 'Outbound Delivery' } ] }
+    @UI: {  lineItem:       [ { position: 20, label: 'Outbound Delivery', cssDefault.width: '100px', type: #WITH_URL, url: 'OutboundDeliveryURL' } ],
+            identification: [ { position: 20, label: 'Outbound Delivery', type: #WITH_URL, url: 'OutboundDeliveryURL' } ] }
     OutboundDelivery;
 
     @UI: {  lineItem:       [ { position: 30, label: 'Number of Packages', cssDefault.width: '150px' } ],
@@ -41,6 +41,9 @@ annotate entity ZC_AVAILABLE_003 with
             identification: [ { position: 40, label: 'Sold To Party' } ] }
     @UI.hidden: true
     SoldToParty;
+
+    @UI.hidden: true
+    OutboundDeliveryURL;
 
     @UI.hidden: true
     CreatedBy;

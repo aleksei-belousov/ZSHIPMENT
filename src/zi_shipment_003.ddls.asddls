@@ -30,6 +30,7 @@ association [0..1] to I_BuPaIdentification as _BuPaIdentification on $projection
     taxjurisdictioncode as TaxJurisdictionCode,
     streetpostalcode as StreetPostalCode,
     instructions as Instructions,
+    partyurl as PartyURL,
 
     createdby as CreatedBy,
     createdat as CreatedAt,

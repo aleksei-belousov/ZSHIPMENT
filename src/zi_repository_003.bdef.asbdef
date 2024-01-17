@@ -35,6 +35,7 @@ etag master LastChangedAt
 
   side effects {
     action make_pdf affects field pdf;
+    field xdp affects $self;
   }
 
 }

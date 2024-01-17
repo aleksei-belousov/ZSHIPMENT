@@ -29,7 +29,6 @@ etag master LocalLastChangedAt
 
   // Events:
   determination on_create on modify { field ShipmentUUID; }
-  determination on_save_customer on save { field PartyID; }
   determination on_modify_customer on modify { field PartyID; }
 
   // Associations:
@@ -44,6 +43,9 @@ etag master LocalLastChangedAt
     action release affects field Released;
     field PartyID affects $self;
     action create_tariff_document affects entity _Outbound;
+    action create_eci affects entity _Outbound;
+    action create_invoice affects entity _Outbound;
+    action create_tkz_list affects entity _Outbound;
   }
 
 }
