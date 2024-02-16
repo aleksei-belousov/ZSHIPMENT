@@ -14,7 +14,9 @@ define root view entity ZC_SHIPMENT_003 provider contract transactional_query as
     SoldToParty as SoldToParty,
     _Customer.CustomerName as CustomerName,
     
+    @EndUserText.label: 'Released'
     Released,
+    
     ConfirmationDate,
 
     Tour,
@@ -25,6 +27,10 @@ define root view entity ZC_SHIPMENT_003 provider contract transactional_query as
     @EndUserText.label: 'Party ID'
     PartyID,
     
+    @Consumption.valueHelpDefinition: [ { entity: { name: 'I_Customer', element: 'Customer' } } ]
+    @EndUserText.label: 'Import Invoice Recipient'
+    ImportInvoiceRecipient, 
+
     OrganisationFormattedName1,
     OrganisationFormattedName2,
     OrganisationFormattedName3,
@@ -37,6 +43,8 @@ define root view entity ZC_SHIPMENT_003 provider contract transactional_query as
     StreetPostalCode,
     Instructions, 
     PartyURL,
+    ImportInvoiceRecipientURL,
+    
     _BuPaIdentification.BPIdentificationNumber as BPIdentificationNumber,
     
     CreatedBy,

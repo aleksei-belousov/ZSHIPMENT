@@ -14,20 +14,9 @@ CLASS zcl_rap_shipment_003_test DEFINITION PUBLIC FINAL CREATE PUBLIC.
     METHODS delete_shipment.
     METHODS update_shipment.
 
-ENDCLASS.
+ENDCLASS. " zcl_rap_shipment_003_test DEFINITION
 
-
-
-CLASS ZCL_RAP_SHIPMENT_003_TEST IMPLEMENTATION.
-
-
-  METHOD create_shipment.
-  ENDMETHOD. " create_shipment
-
-
-  METHOD delete_shipment.
-  ENDMETHOD. " delete_shipment
-
+CLASS zcl_rap_shipment_003_test IMPLEMENTATION.
 
   METHOD if_oo_adt_classrun~main.
 
@@ -52,7 +41,6 @@ CLASS ZCL_RAP_SHIPMENT_003_TEST IMPLEMENTATION.
     update_shipment( ).
 
   ENDMETHOD. " if_oo_adt_classrun~main
-
 
   METHOD read_list.
 
@@ -109,10 +97,14 @@ CLASS ZCL_RAP_SHIPMENT_003_TEST IMPLEMENTATION.
 
   ENDMETHOD. " read_list
 
-
   METHOD read_shipment.
   ENDMETHOD. " read_shipment
 
+  METHOD create_shipment.
+  ENDMETHOD. " create_shipment
+
+  METHOD delete_shipment.
+  ENDMETHOD. " delete_shipment
 
   METHOD update_shipment.
 
@@ -194,4 +186,5 @@ CLASS ZCL_RAP_SHIPMENT_003_TEST IMPLEMENTATION.
 
 
   ENDMETHOD. " delete_shipment
-ENDCLASS.
+
+ENDCLASS. " zcl_rap_shipment_003_test IMPLEMENTATION

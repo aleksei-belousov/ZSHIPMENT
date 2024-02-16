@@ -19,6 +19,7 @@ association [0..1] to I_BuPaIdentification as _BuPaIdentification on $projection
     transportationtype as TransportationType, 
     freightforwarderclient as FreightForwarderClient,
     partyid as PartyID,
+    importinvoicerecipient as ImportInvoiceRecipient, 
     organisationformattedname1 as OrganisationFormattedName1,
     organisationformattedname2 as OrganisationFormattedName2,
     organisationformattedname3 as OrganisationFormattedName3,
@@ -31,6 +32,7 @@ association [0..1] to I_BuPaIdentification as _BuPaIdentification on $projection
     streetpostalcode as StreetPostalCode,
     instructions as Instructions,
     partyurl as PartyURL,
+    importinvoicerecipienturl as ImportInvoiceRecipientURL,
 
     createdby as CreatedBy,
     createdat as CreatedAt,

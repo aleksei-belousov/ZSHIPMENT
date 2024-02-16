@@ -37,6 +37,8 @@ CLASS lhc_shipment DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
     METHODS create_eci FOR MODIFY
       IMPORTING keys FOR ACTION Shipment~create_eci.
+    METHODS on_modify_recipient FOR DETERMINE ON MODIFY
+      IMPORTING keys FOR Shipment~on_modify_recipient.
 
 ******** Internal Methods *********
 
@@ -62,6 +64,17 @@ CLASS lhc_shipment DEFINITION INHERITING FROM cl_abap_behavior_handler.
     METHODS get_components_internal
       IMPORTING VALUE(i_product)                        TYPE string
       EXPORTING VALUE(o_components)                     TYPE string.
+
+    METHODS split_string_internal
+      IMPORTING VALUE(i_str)                            TYPE string
+                VALUE(i_len)                            TYPE I OPTIONAL
+      RETURNING VALUE(o_str)                            TYPE string.
+
+    METHODS get_commodity_code_internal
+      IMPORTING VALUE(i_code)                           TYPE string
+      EXPORTING VALUE(o_code)                           TYPE string
+                VALUE(o_description)                    TYPE string.
+
 
 ENDCLASS. " lhc_shipment DEFINITION
 
@@ -138,6 +151,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                 RETURN.
             ENDIF.
 
+*           Outbound Delivery
             READ ENTITIES OF zi_shipment_003  IN LOCAL MODE
                 ENTITY Shipment
                 BY \_Available
@@ -155,6 +169,26 @@ CLASS lhc_shipment IMPLEMENTATION.
             ENDIF.
 
             SORT lt_available STABLE BY OutboundDelivery.
+
+
+*           Attachments
+            READ ENTITIES OF zi_shipment_003  IN LOCAL MODE
+                ENTITY Shipment
+                BY \_Outbound
+                ALL FIELDS WITH VALUE #( (
+                    %tky = <entity>-%tky
+                ) )
+                RESULT DATA(lt_outbound)
+                FAILED DATA(failed2)
+                REPORTED DATA(reported2).
+
+            IF ( lt_outbound[] IS INITIAL ).
+*               Short format message
+*                APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'No Attachment.' ) ) TO reported-shipment.
+*                RETURN.
+            ENDIF.
+
+            SORT lt_outbound STABLE BY OutboundID.
 
             SELECT SINGLE BPIdentificationNumber FROM zc_shipment_003 WHERE ( ShipmentUUID = @<entity>-ShipmentUUID ) INTO @DATA(bpIdentificationNumber).
 
@@ -180,9 +214,12 @@ CLASS lhc_shipment IMPLEMENTATION.
             request_body = request_body && '<TaxJurisdictionCode>' && <entity>-TaxJurisdictionCode && '</TaxJurisdictionCode>' && cl_abap_char_utilities=>cr_lf.
             request_body = request_body && '<StreetPostalCode>' && <entity>-StreetPostalCode && '</StreetPostalCode>' && cl_abap_char_utilities=>cr_lf.
             request_body = request_body && '<Instructions>' && <entity>-Instructions && '</Instructions>' && cl_abap_char_utilities=>cr_lf.
+
+            DATA availableID        TYPE string.
+            DATA outboundDelivery   TYPE string..
             LOOP AT lt_available INTO DATA(ls_available).
-                DATA(availableID) = |{ ls_available-AvailableID ALPHA = OUT }|.
-                DATA(outboundDelivery) = |{ ls_available-OutboundDelivery ALPHA = IN }|.
+                availableID         = |{ ls_available-AvailableID ALPHA = OUT }|.
+                outboundDelivery    = |{ ls_available-OutboundDelivery ALPHA = IN }|.
                 SELECT SINGLE UnloadingPointName FROM zc_available_003 WHERE ( AvailableUUID = @ls_available-availableUUID ) INTO @DATA(unloadingPointName).
                 request_body = request_body && '<OutboundDelivery>' && cl_abap_char_utilities=>cr_lf.
                 request_body = request_body && '<ItemID>' && availableID && '</ItemID>' && cl_abap_char_utilities=>cr_lf.
@@ -190,6 +227,42 @@ CLASS lhc_shipment IMPLEMENTATION.
                 request_body = request_body && '<NumberOfPackages>' && unloadingPointName && '</NumberOfPackages>' && cl_abap_char_utilities=>cr_lf.
                 request_body = request_body && '</OutboundDelivery>' && cl_abap_char_utilities=>cr_lf.
             ENDLOOP.
+
+            DATA outboundID TYPE string.
+            DATA fileName   TYPE string.
+            DATA mimeType   TYPE string.
+            DATA base64     TYPE string.
+            LOOP AT lt_outbound INTO DATA(ls_outbound).
+                outboundID      = |{ ls_outbound-OutboundID ALPHA = OUT }|.
+                CONDENSE outboundID NO-GAPS.
+                fileName        = ls_outbound-FileName.
+                mimeType        = ls_outbound-MimeType.
+                SELECT SINGLE attachment FROM zc_outbound_003 WHERE ( OutboundUUID = @ls_outbound-OutboundUUID ) INTO @DATA(attachment).
+                base64       = cl_web_http_utility=>encode_x_base64( attachment ). " convert Xstring (binary) into Base64 (string)
+                request_body = request_body && '<Attachment>' && cl_abap_char_utilities=>cr_lf.
+                request_body = request_body && '<ID>' && outboundID && '</ID>' && cl_abap_char_utilities=>cr_lf.
+                request_body = request_body && '<FileName>' && fileName && '</FileName>' && cl_abap_char_utilities=>cr_lf.
+                request_body = request_body && '<MimeType>' && mimeType && '</MimeType>' && cl_abap_char_utilities=>cr_lf.
+                request_body = request_body && '<Content>' && cl_abap_char_utilities=>cr_lf.
+*               Split by 50
+                DATA(l) = STRLEN( base64 ). " total length
+                DATA(p) = 0.                " starting position
+                DATA s TYPE string.         " substring C(50)
+                DO 1000 TIMES.
+                    IF      ( ( p + 50 ) < l ).
+                        s = base64+p(50).
+                    ELSEIF  ( ( p + 0  ) < l ).
+                        s = base64+p.
+                    ELSE.
+                        EXIT.
+                    ENDIF.
+                    request_body = request_body && s && cl_abap_char_utilities=>cr_lf.
+                    p = p + 50.
+                ENDDO.
+                request_body = request_body && '</Content>' && cl_abap_char_utilities=>cr_lf.
+                request_body = request_body && '</Attachment>' && cl_abap_char_utilities=>cr_lf.
+            ENDLOOP.
+
             request_body = request_body && '</ShipmentBinding>' && cl_abap_char_utilities=>cr_lf.
 
 *           Do Free Style HTTP Request
@@ -198,6 +271,11 @@ CLASS lhc_shipment IMPLEMENTATION.
                 DATA i_url         TYPE string VALUE 'https://felina-hu-scpi-test-eyjk96r2.it-cpi018-rt.cfapps.eu10-003.hana.ondemand.com/http/FiegeShipmentBindingRequest'.
                 DATA i_username    TYPE string VALUE 'sb-1e950f89-c676-4acd-b0dc-24e58f8aab45!b143168|it-rt-felina-hu-scpi-test-eyjk96r2!b117912'.
                 DATA i_password    TYPE string VALUE 'cc744b1f-5237-4a7e-ab44-858fdd00fb73$3wcTQpYfe1kbmjltnA8zSDb5ogj0TpaYon4WHM-TwfE='.
+
+                DATA(system_url) = cl_abap_context_info=>get_system_url( ).
+                IF ( system_url(8) = 'my404898' ). " dev-cust
+                    i_url = 'https://felina-hu-scpi-test-eyjk96r2.it-cpi018-rt.cfapps.eu10-003.hana.ondemand.com/http/FiegeOutboundDevCust'.
+                ENDIF.
 
                 DATA(http_destination) = cl_http_destination_provider=>create_by_url(
                     i_url = i_url
@@ -262,6 +340,12 @@ CLASS lhc_shipment IMPLEMENTATION.
                 APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'HTTP Dest Provider Error.' ) ) TO reported-shipment.
                 RETURN.
 
+            CATCH cx_abap_context_info_error INTO DATA(lx_abap_context_info_error).
+                "handle exception
+*              RAISE SHORTDUMP lx_abap_context_info_error.
+                APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'ABAP Context Info Error.' ) ) TO reported-shipment.
+                RETURN.
+
             ENDTRY.
 
 *           SELECT OutboundDelivery FROM I_OutboundDeliveryTP WHERE ( SoldToParty = @sold_to_party ) INTO TABLE @DATA(lt_outbound_delivery).
@@ -273,9 +357,9 @@ CLASS lhc_shipment IMPLEMENTATION.
                     %tky        = <entity>-%tky
                     Released    = abap_true
                 ) )
-                FAILED DATA(failed2)
-                MAPPED DATA(mapped2)
-                REPORTED DATA(reported2).
+                FAILED DATA(failed3)
+                MAPPED DATA(mapped3)
+                REPORTED DATA(reported3).
 
         ENDIF.
 
@@ -334,6 +418,7 @@ CLASS lhc_shipment IMPLEMENTATION.
         DATA SecondLineName         TYPE string.
         DATA ThirdLineName          TYPE string.
         DATA FourthLineName         TYPE string.
+        DATA FifthLineName          TYPE string.
 
 *       Formatted Address
         DATA FirstLineDescription   TYPE string.
@@ -443,10 +528,10 @@ CLASS lhc_shipment IMPLEMENTATION.
 
                 SORT it_available STABLE BY AvailableID.
 
-                DATA quantity  TYPE I_BillingDocumentItem-BillingQuantity.
-                DATA listPrice TYPE I_BillingDocumentItem-NetAmount.
-                DATA discount  TYPE I_BillingDocumentItem-NetAmount.
-                DATA mainPrice TYPE I_BillingDocumentItem-NetAmount.
+                DATA quantity   TYPE I_BillingDocumentItem-BillingQuantity.
+                DATA listPrice  TYPE I_BillingDocumentItem-NetAmount.
+                DATA discount   TYPE I_BillingDocumentItem-NetAmount.
+                DATA mainPrice  TYPE I_BillingDocumentItem-NetAmount.
 
                 DATA totalQuantity  TYPE I_BillingDocumentItem-BillingQuantity  VALUE 0.
                 DATA totalListPrice TYPE I_BillingDocumentItem-NetAmount        VALUE 0.
@@ -509,6 +594,55 @@ CLASS lhc_shipment IMPLEMENTATION.
                         discount  = ( pricingElement-ConditionAmount ). " negative value
                         listPrice = ( billingdocumentitem-NetAmount - pricingElement-ConditionAmount ).
 
+*                       Fix - In the column “Preis” there must be the gross value (PPR0 price)
+*                       Gross Price (from PricingElement)
+                        CLEAR pricingElement.
+                        SELECT SINGLE
+                                *
+                            FROM
+                                I_BillingDocumentItem\_PricingElement as PricingElement
+                            WHERE
+                                ( BillingDocument     = @billingdocumentitem-BillingDocument        ) AND
+                                ( BillingDocumentItem = @billingdocumentitem-BillingDocumentItem    ) AND
+                                ( ConditionType = 'PPR0' )
+                            INTO
+                                @pricingElement.
+                        DATA(grossAmount)   = pricingElement-ConditionAmount.
+
+*                       Rebate % and Amount (from PricingElement)
+                        CLEAR pricingElement.
+                        SELECT SINGLE
+                                *
+                            FROM
+                                I_BillingDocumentItem\_PricingElement as PricingElement
+                            WHERE
+                                ( BillingDocument     = @billingdocumentitem-BillingDocument        ) AND
+                                ( BillingDocumentItem = @billingdocumentitem-BillingDocumentItem    ) AND
+                                ( ConditionType = 'ZK07' )
+                            INTO
+                                @pricingElement.
+                        DATA(rebatePercent) = pricingElement-ConditionRateValue.
+                        DATA(rebateAmount)  = pricingElement-ConditionAmount.
+                        rebateAmount        = - ( rebateAmount ). " 5.61
+
+*                       Verpackungsentgelt - Packaging fee (from PricingElement)
+                        CLEAR pricingElement.
+                        SELECT SINGLE
+                                *
+                            FROM
+                                I_BillingDocumentItem\_PricingElement as PricingElement
+                            WHERE
+                                ( BillingDocument     = @billingdocumentitem-BillingDocument        ) AND
+                                ( BillingDocumentItem = @billingdocumentitem-BillingDocumentItem    ) AND
+                                ( ConditionType = 'ZLAB' )
+                            INTO
+                                @pricingElement.
+                        DATA(feeAmount) = pricingElement-ConditionAmount. " 5.00
+
+*                       Take a few amounts just from the Invoice Item
+                        grossAmount     = billingdocumentitem-Subtotal1Amount.
+                        feeAmount       = billingdocumentitem-Subtotal4Amount.
+
 *                       Item:
                         CLEAR item.
                         item-MaterialCup                = cupsize.
@@ -516,24 +650,34 @@ CLASS lhc_shipment IMPLEMENTATION.
                         item-MaterialColor              = colorDescription.
                         item-MaterialQuantity           = |{ billingdocumentitem-BillingQuantity DECIMALS = 1 }|.
                         item-MatierialID                = |{ billingdocumentitem-Product ALPHA = IN }|.
-                        item-MaterialPrice              = |{ listPrice DECIMALS = 2 }|.
-                        item-MaterialDiscountPercent    = |{ pricingElement-ConditionRateValue }|. " '51%'
+                        item-MaterialPrice              = |{ grossAmount DECIMALS = 2 }|. " 47.25
+                        item-MaterialDiscountPercent    = |{ rebatePercent }|. " '11.4%'
                         item-CountryOfOrigin            = billingdocumentitem-CountryOfOrigin.
                         APPEND item TO it_item.
 
                         totalQuantity   = totalQuantity     + ( quantity ).
-                        totalListPrice  = totalListPrice    + ( listPrice ).
-                        totalDiscount   = totalDiscount     + ( discount ).
-                        totalMainPrice  = totalMainPrice    + ( mainPrice ).
+                        totalListPrice  = totalListPrice    + ( item-MaterialPrice ).
+                        totalDiscount   = totalDiscount     + ( rebateAmount ).
+                        totalMainPrice  = totalMainPrice    + ( mainPrice - feeAmount ).
 
                     ENDLOOP.
 
                 ENDLOOP.
 
-                header-TotalQuantity        = |{ totalQuantity  DECIMALS = 1 }|.
-                header-TotalListPrice       = |{ totalListPrice DECIMALS = 2 }|.
-                header-TotalDiscount        = |{ totalDiscount  DECIMALS = 2 }|.
-                header-TotalMainPrice       = |{ totalMainPrice DECIMALS = 2 }|.
+                header-TotalCurrencyCode    = billingdocument-TransactionCurrency.  " Währung
+
+                header-TotalQuantity        = |{ totalQuantity  DECIMALS = 1 }|.    " Menge
+                header-TotalListPrice       = |{ totalListPrice DECIMALS = 2 }|.    " Warenwert
+                header-TotalDiscount        = |{ totalDiscount  DECIMALS = 2 }|.    " Positionsrabatt
+                header-TotalMainPrice       = |{ totalMainPrice DECIMALS = 2 }|.    " Rechnungsbetrag
+
+
+*               Import Invoice recipient address (Hard Code, for now)
+                header-FirstLineName    = 'Felina GmbH'.
+                header-SecondLineName   = 'c/o CCI France Suisse'.
+                header-ThirdLineName    = 'Route de Jussy 35'.
+                header-FourthLineName   = '1211 Genève 6'.
+                header-FifthLineName    = 'Schweiz'.
 
 *               Generate XML
                 DATA xml_data TYPE string VALUE ''.
@@ -561,6 +705,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                     '<SecondLineName>' && header-SecondLineName && '</SecondLineName>' && cl_abap_char_utilities=>cr_lf && " 'Plac Bankowy 4 VA BANK'
                     '<ThirdLineName>' && header-ThirdLineName && '</ThirdLineName>' && cl_abap_char_utilities=>cr_lf && " '00-095 WARSZAWA'
                     '<FourthLineName>' && header-FourthLineName && '</FourthLineName>' && cl_abap_char_utilities=>cr_lf && " 'Poland'
+                    '<FifthLineName>' && header-FifthLineName && '</FifthLineName>' && cl_abap_char_utilities=>cr_lf && " 'Poland'
                     '</Name>' && cl_abap_char_utilities=>cr_lf &&
                     '</Name>' && cl_abap_char_utilities=>cr_lf &&
                     '<PostalAddress>' && cl_abap_char_utilities=>cr_lf &&
@@ -753,16 +898,6 @@ CLASS lhc_shipment IMPLEMENTATION.
                     INTO
                         @DATA(customersalesarea).
 
-*                DATA formatted_date TYPE string.
-*                cl_abap_datfm=>conv_date_int_to_ext(
-*                  EXPORTING
-*                    im_datint    = cl_abap_context_info=>get_system_date( )
-**                    im_datfmdes
-*                  IMPORTING
-*                    ex_datext    = formatted_date " 04.01.2024
-**                    ex_datfmused =
-*                ).
-
 *               Header
                 header-ID                           = |{ <entity>-ShipmentID ALPHA = OUT }|. " '1000000059'.
                 header-TKZNumber                    = |{ <entity>-ShipmentID ALPHA = OUT }|.
@@ -815,17 +950,6 @@ CLASS lhc_shipment IMPLEMENTATION.
 
 *                       Product
                         SELECT SINGLE * FROM I_Product  WHERE ( Product = @billingdocumentitem-Product ) INTO @DATA(product).
-
-**                       Date Of Invoice
-*                        DATA dateOfInvoice TYPE string.
-*                        cl_abap_datfm=>conv_date_int_to_ext(
-*                          EXPORTING
-*                            im_datint    = billingdocument-billingdocumentdate
-**                            im_datfmdes  =
-*                          IMPORTING
-*                            ex_datext    = dateOfInvoice " 04.01.2024
-**                            ex_datfmused =
-*                        ).
 
 *                       Material Quantity
                         DATA materialQuantity TYPE string.
@@ -1178,6 +1302,29 @@ CLASS lhc_shipment IMPLEMENTATION.
                             INTO
                                 @DATA(prodcommoditycodeforkeydate).
 
+*                       Commodity Code Text
+*                        DATA commodityCodeText TYPE string.
+*                        SELECT SINGLE
+*                                \_CommodityCodeText-TrdClassfctnNmbrText AS TrdClassfctnNmbrText
+*                             FROM
+*                                C_ProdCommodityCodeForKeyDate( p_keydate = @billingdocument-billingdocumentdate )
+*                             WHERE
+*                                ( C_ProdCommodityCodeForKeyDate~Product                     = @billingdocumentitem-Product                   ) AND
+*                                ( C_ProdCommodityCodeForKeyDate~Country                     = @billingdocumentitem-DepartureCountry          ) AND
+*                                ( C_ProdCommodityCodeForKeyDate~ValidityStartDate           = @prodcommoditycodeforkeydate-ValidityStartDate ) AND
+*                                ( C_ProdCommodityCodeForKeyDate~TrdClassfctnNmbrSchm        = 'EU01'                                         ) AND
+*                                ( C_ProdCommodityCodeForKeyDate~TrdClassfctnNmbrSchmCntnt   = 'EU01'                                         ) AND
+*                                ( \_CommodityCodeText-TrdClassfctnNmbrSchmCntnt IS NOT NULL )
+*                             INTO
+*                                @DATA(commodityCodeText).
+                        get_commodity_code_internal(
+                            EXPORTING
+                                i_code        = CONV string( prodcommoditycodeforkeydate-CommodityCode )
+                            IMPORTING
+                                o_code        = DATA(commodityCode)
+                                o_description = DATA(commodityCodeText)
+                        ).
+
 *                       Customer
                         SELECT SINGLE
                                 *
@@ -1197,6 +1344,28 @@ CLASS lhc_shipment IMPLEMENTATION.
                                 ( Product = @billingdocumentitem-Product )
                             INTO
                                 @DATA(product).
+
+*                       Country Of Origin
+*                        DATA countryOfOrigin TYPE string.
+*                        SELECT SINGLE
+*                                \_ESHProductPlant-CountryOfOrigin
+*                            FROM
+*                                I_Product
+*                            WHERE
+*                                ( I_Product~Product         = @billingdocumentitem-Product  ) AND
+*                                ( \_ESHProductPlant-Plant   = '1000'                        ) AND " Fiege DE
+*                                ( \_ESHProductPlant-Product IS NOT NULL )
+*                            INTO
+*                                @DATA(countryOfOrigin).
+                        SELECT SINGLE
+                                ProdPlantInternationalTrade~CountryOfOrigin
+                            FROM
+                                I_ProductTP_2\_ProductPlant\_ProdPlantInternationalTrade as ProdPlantInternationalTrade
+                            WHERE
+                                ( Product = @billingdocumentitem-Product ) AND
+                                ( Plant   = '1000'                       )  " Fiege DE
+                            INTO
+                                @DATA(countryOfOrigin).
 
 *                       Date Of Invoice
                         DATA dateOfInvoice TYPE string.
@@ -1228,8 +1397,8 @@ CLASS lhc_shipment IMPLEMENTATION.
 *                       Item:
                         CLEAR item.
                         item-CustomsTariffNumber   = prodcommoditycodeforkeydate-CommodityCode.     " '62121090'.
-                        item-Items                 = billingdocumentitem-BillingDocumentItemText.   " 'Brassel for ladies'.
-                        item-CountryOfOrigin       = product-CountryOfOrigin.                       " 'MA'.
+                        item-Items                 = commodityCodeText.                             " 'Brassel for ladies'.
+                        item-CountryOfOrigin       = countryOfOrigin.                               " 'AU'.
                         item-NetWeight             = netWeight.                                     " '4.005'.
                         item-unitCode1             = outbounddeliveryitem-ItemWeightUnit.           " 'KG'.
                         item-MaterialQuantity      = materialQuantity.                              " '52.0'.
@@ -1251,13 +1420,14 @@ CLASS lhc_shipment IMPLEMENTATION.
                     ENDLOOP.
                 ENDLOOP.
 
-*               Group it_item By CustomsTariffNumber (Commodity Code)
-                SORT it_item STABLE BY CustomsTariffNumber.
+*               Group it_item By CustomsTariffNumber (Commodity Code), CountryOfOrigin
+                SORT it_item STABLE BY CustomsTariffNumber CountryOfOrigin.
                 DATA it_item2 LIKE it_item.
                 DATA item2 LIKE item.
                 CLEAR item2.
                 LOOP AT it_item INTO item.
-                    IF ( item-CustomsTariffNumber = item2-CustomsTariffNumber ) AND
+                    IF ( item-CustomsTariffNumber   = item2-CustomsTariffNumber ) AND
+                       ( item-CountryOfOrigin       = item2-CountryOfOrigin     ) AND
                        ( sy-tabix <> 1 ).
                         item2-NetWeight         = |{ 0 + item2-NetWeight           + item-NetWeight         DECIMALS = 3 }|.
                         item2-MaterialQuantity  = |{ 0 + item2-MaterialQuantity    + item-MaterialQuantity  DECIMALS = 1 }|.
@@ -1451,19 +1621,41 @@ CLASS lhc_shipment IMPLEMENTATION.
 
         LOOP AT it_available INTO DATA(available).
 
-            body = body && '1125518;1;'.
-            CASE <entity>-PartyID.  " Shipment Group (Sendungsgruppe)
-                WHEN 'ECI VALDEMORO MADRID'.
-                    body = body && '50;'.
-                WHEN 'ECI MONTORNES BARCELONA'.
-                    body = body && '62;'.
-                WHEN OTHERS.
-                    body = body && ';'.
-            ENDCASE.
-            body = body && '1;'.
+*           Outbound Delivery
+            SELECT SINGLE * FROM I_OutboundDelivery WHERE ( OutboundDelivery = @available-OutboundDelivery ) INTO @DATA(outboundDelivery).
 
-            IF ( 1 = 2 ).
-*               TODO
+*           Outbound Delivery Item
+            SELECT SINGLE * FROM I_OutboundDeliveryItem WHERE ( OutboundDelivery = @available-OutboundDelivery ) INTO @DATA(outboundDeliveryItem).
+
+*           Sales Order
+            SELECT SINGLE * FROM I_SalesOrder WHERE ( SalesOrder = @outboundDeliveryItem-ReferenceSDDocument ) INTO @DATA(salesOrder).
+
+*           Address Details
+            SELECT SINGLE * FROM I_BusinessPartnerAddressTP_3  WHERE ( BusinessPartner = @outboundDelivery-SoldToParty ) INTO @DATA(businessPartnerAddress).
+
+*           Proveedor
+            body = body && '1125518' && ';'.
+
+*           Empresa RecepciÃ³n
+            body = body && '1' && ';'.
+
+*            Lugar RecepciÃ³n
+*            "Shipment Group Madrid = 50, Shipment Group Barcelona = 62, Shipment Group Portugal = 53" (hard code)
+*            CASE <entity>-PartyID.  " Shipment Group (Sendungsgruppe)
+*                WHEN 'ECI VALDEMORO MADRID'.
+*                    body = body && '50;'.
+*                WHEN 'ECI MONTORNES BARCELONA'.
+*                    body = body && '62;'.
+*                WHEN OTHERS.
+*                    body = body && ';'.
+*            ENDCASE.
+*           Benedikt Pecuch: "zoberte to z Customer master data zo shipment group Name 3"
+            body = body && <entity>-OrganisationFormattedName3 && ';'. " 50
+
+*           Empresa Destino
+            body = body && '1' && ';'.
+
+*            TODO - Taken from ByDesign:
 *            IF ( <entity>-Response IS NOT INITIAL ).
 *            {
 *                var query = SalesOrder.QueryByElements;
@@ -1508,10 +1700,35 @@ CLASS lhc_shipment IMPLEMENTATION.
 *                body = body + addedShipmentResponse.Response.ODRequestID.RemoveLeadingZeros() + ";";
 *                body = body + addedShipmentResponse.Response.NumberOfPackages.RoundToString(0) + ";";
 *            }
-            ELSE.
-                body = body && ';100;;;;'.
-            ENDIF.
-            body = body && 'b;Senator;0'.
+*            ELSE.
+*                body = body && ';100;'.
+*            ENDIF.
+
+*           Lugar destino ("customer master data -> Main Adress -> Adress Line 1 -> first 3 digits")
+            body = body && businessPartnerAddress-StreetPrefixName(3) && ';'. " 994
+
+*           Uneco (always 110)
+            body = body && '110' && ';'. " 110
+
+* New Change
+*           Pedido (External Reference (from SO))
+            body = body && |{ salesOrder-PurchaseOrderByCustomer ALPHA = OUT }| && ';'. " Fiege 16.5
+
+*           AlbarÃ¡n (delivery note)
+            body = body && |{ available-OutboundDelivery ALPHA = OUT }| && ';'. " 80000120
+
+*           Bultos (number of packages)
+            body = body && |{ outboundDelivery-UnloadingPointName ALPHA = OUT }| && ';'. " 1
+
+*           Embalaje
+            body = body && 'b;'.
+
+*           Transportista
+            body = body && 'Senator;'.
+
+*           ExpediciĂłn
+            body = body && '0'.
+
             body = body && cl_abap_char_utilities=>cr_lf.
 
         ENDLOOP.
@@ -1609,17 +1826,20 @@ CLASS lhc_shipment IMPLEMENTATION.
 
         ENDIF.
 
-        " Read transfered instances
+        " Read the Customer
         SELECT SINGLE * FROM I_Customer WHERE ( Customer = @partyID ) INTO @DATA(ls_customer).
 
         IF ( sy-subrc = 0 ).
 
+            " Read a Customer Sales Area (first met)
+            SELECT SINGLE * FROM I_Customer\_CustomerSalesArea as CustomerSalesArea WHERE ( Customer = @partyID ) INTO @DATA(customerSalesArea).
+
             DATA(tx03) = get_texts_internal(
                 EXPORTING
                     i_customer             = CONV string( ls_customer-Customer )
-                    i_sales_organization   = '1000'
-                    i_distribution_channel = '10'
-                    i_division             = '00'
+                    i_sales_organization   = CONV string( customerSalesArea-SalesOrganization )     " '1000'
+                    i_distribution_channel = CONV string( customerSalesArea-DistributionChannel )   " '10'
+                    i_division             = CONV string( customerSalesArea-Division )              " '00'
                     i_language             = 'EN'
                     i_long_text_id         = 'TX03'
             ).
@@ -1627,9 +1847,9 @@ CLASS lhc_shipment IMPLEMENTATION.
             DATA(zfw1) = get_texts_internal(
                 EXPORTING
                     i_customer             = CONV string( ls_customer-Customer )
-                    i_sales_organization   = '1000'
-                    i_distribution_channel = '10'
-                    i_division             = '00'
+                    i_sales_organization   = CONV string( customerSalesArea-SalesOrganization ) " '1000'
+                    i_distribution_channel = CONV string( customerSalesArea-DistributionChannel )   " '10'
+                    i_division             = CONV string( customerSalesArea-Division )              " '00'
                     i_language             = 'EN'
                     i_long_text_id         = 'ZFW1'
             ).
@@ -1637,9 +1857,9 @@ CLASS lhc_shipment IMPLEMENTATION.
             DATA(zlvs) = get_texts_internal(
                 EXPORTING
                     i_customer             = CONV string( ls_customer-Customer )
-                    i_sales_organization   = '1000'
-                    i_distribution_channel = '10'
-                    i_division             = '00'
+                    i_sales_organization   = CONV string( customerSalesArea-SalesOrganization )     " '1000'
+                    i_distribution_channel = CONV string( customerSalesArea-DistributionChannel )   " '10'
+                    i_division             = CONV string( customerSalesArea-Division )              " '00'
                     i_language             = 'EN'
                     i_long_text_id         = 'ZLVS'
             ).
@@ -1712,6 +1932,70 @@ CLASS lhc_shipment IMPLEMENTATION.
 
   ENDMETHOD. " on_modify_customer
 
+  METHOD on_modify_recipient.
+
+    DATA importInvoiceRecipient TYPE zi_shipment_003-ImportInvoiceRecipient.
+
+     " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Shipment
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+        ENDIF.
+        IF ( <entity>-%is_draft = '01' ). " Draft
+        ENDIF.
+
+        importInvoiceRecipient = |{ <entity>-ImportInvoiceRecipient ALPHA = IN }|. " Add leading zeros
+
+        IF ( importInvoiceRecipient <> <entity>-ImportInvoiceRecipient ).
+
+            MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+                ENTITY Shipment
+                UPDATE FIELDS (
+                    ImportInvoiceRecipient
+                )
+                WITH VALUE #( (
+                    %tky                    = <entity>-%tky
+                    ImportInvoiceRecipient  = importInvoiceRecipient
+                ) )
+                MAPPED DATA(mapped1)
+                FAILED DATA(failed1)
+                REPORTED DATA(reported1).
+
+        ENDIF.
+
+        " Read the Customer
+        SELECT SINGLE * FROM I_Customer WHERE ( Customer = @importInvoiceRecipient ) INTO @DATA(customer).
+
+        IF ( sy-subrc = 0 ).
+        ENDIF.
+
+*       Link to Import Invoice Recipient
+        DATA(importInvoiceRecipientURL) = |/ui#Customer-displayFactSheet?sap-ui-tech-hint=GUI&/C_CustomerOP('| && condense( val = |{ <entity>-importInvoiceRecipient ALPHA = OUT }| ) && |')|.
+
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment
+            UPDATE FIELDS (
+                ImportInvoiceRecipientURL
+            )
+            WITH VALUE #( (
+                %is_draft                   = <entity>-%is_draft
+                %key                        = <entity>-%key
+                ImportInvoiceRecipientURL   = importInvoiceRecipientURL
+            ) )
+            MAPPED DATA(mapped2)
+            FAILED DATA(failed2)
+            REPORTED DATA(reported2).
+
+    ENDLOOP.
+
+  ENDMETHOD. " on_modify_recipient
+
   METHOD get_texts_internal.
 
 * https://my404907.s4hana.cloud.sap/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_CustomerSalesAreaText(Customer='GKK',SalesOrganization='1000',DistributionChannel='10',Division='00',Language='EN',LongTextID='ZFW1')
@@ -1719,9 +2003,12 @@ CLASS lhc_shipment IMPLEMENTATION.
     TRY.
 
 *  DATA(i_url) = 'https://my404898-api.s4hana.cloud.sap/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_CustomerSalesAreaText(Customer=''10001722'',SalesOrganization=''1000'',DistributionChannel=''10'',Division=''00'',Language=''EN'',LongTextID=''ZLVS'')'.
-        DATA(system_url)    = cl_abap_context_info=>get_system_url( ).
-        DATA(customer)      = '''' && i_customer && ''','.
-        DATA(long_text_id)  = '''' && i_long_text_id && ''')'.
+        DATA(system_url)            = cl_abap_context_info=>get_system_url( ).
+        DATA(customer)              = '''' && i_customer && ''','.
+        DATA(salesOrganization)     = '''' && i_sales_organization && ''','.
+        DATA(distributionChannel)   = '''' && i_distribution_channel && ''','.
+        DATA(division)              = '''' && i_division && ''','.
+        DATA(long_text_id)          = '''' && i_long_text_id && ''')'.
         CONCATENATE
                 'https://'
                 system_url(8) " my404898
@@ -1729,11 +2016,11 @@ CLASS lhc_shipment IMPLEMENTATION.
                 'Customer='
                 customer " '''10001722'','
                 'SalesOrganization='
-                '''1000'','
+                salesOrganization " '''1000'','
                 'DistributionChannel='
-                '''10'','
+                distributionChannel " '''10'','
                 'Division='
-                '''00'','
+                division " '''00'','
                 'Language='
                 '''EN'','
                 'LongTextID='
@@ -1951,7 +2238,7 @@ CLASS lhc_shipment IMPLEMENTATION.
 
   ENDMETHOD. " get_forwarding_rule_internal
 
-  METHOD get_components_internal. " * get components of material
+  METHOD get_components_internal. " get components of material
 
     o_components = ''.
 
@@ -1972,6 +2259,271 @@ CLASS lhc_shipment IMPLEMENTATION.
     ENDIF.
 
   ENDMETHOD. " get_components_internal
+
+  METHOD split_string_internal. " Split string into fix length substrings
+
+    DATA input  TYPE string.
+    DATA output TYPE string.
+    DATA fix    TYPE I.
+
+    input   = i_str.
+    output  = ''.
+    fix     = 50.
+
+    IF ( i_len IS SUPPLIED ).
+        IF ( i_len > 0 ).
+            fix = i_len.
+        ENDIF.
+    ENDIF.
+
+*   Split by LEN
+    DATA l TYPE I.      " total length
+    DATA p TYPE I.      " starting position
+    DATA s TYPE string. " substring C(50)
+
+    l = STRLEN( input ).
+    DO 10000 TIMES.
+        IF      ( ( p + fix ) < l ).
+            s = input+p(fix).
+        ELSEIF  ( ( p + 0  ) < l ).
+            s = input+p.
+        ELSE.
+            EXIT.
+        ENDIF.
+        output = output && s && cl_abap_char_utilities=>cr_lf.
+        p = p + 50.
+    ENDDO.
+
+  ENDMETHOD. " split_string_internal
+
+  METHOD get_commodity_code_internal. " Get Commodity Code/Description By Code (output Code is for checking)
+
+*   Hard Code:
+    o_description   = ''.
+    CASE i_code.
+        WHEN '33043000'.  o_description = 'Manicure or pedicure preparations'.
+        WHEN '34022090'.  o_description = 'Washing preparations, incl. auxiliary washing preparations and cleaning preparations put up for retail sale (excl. organic surface-active agents, soap and surface-active preparations, and products and prepa' &&
+                                          'rations for washing the skin in the form of liquid or cream)'.
+        WHEN '34060000'.  o_description = 'Candles, tapers and the like'.
+        WHEN '39199080'.  o_description = 'Self-adhesive plates, sheets, film, foil, tape, strip and other flat shapes, of plastics, in rolls <= 20 cm wide (excl. plastic strips coated with unvulcanised natural or synthetic rubber)'.
+        WHEN '39205990'.  o_description = 'Plates, sheets, foil, film and strip of non-cellular acrylic polymers, not reinforced, coated, laminated or similarly combined with other materials, without backing, unworked or merely surface-worked or mer' &&
+                                          'ely cut into squares or rectangles (excl. those of polymethyl methacrylate, self-adhesive products and floor, wall and ceiling coverings of heading 3918, and copolymer of acrylic and methacrylic esters in t' &&
+                                          'he form of film of a thickness of <= 150 micrometres)'.
+        WHEN '39232100'.  o_description = 'Sacks and bags, incl. cones, of polymers of ethylene'.
+        WHEN '39234090'.  o_description = 'Spools, cops, bobbins and similar supports, of plastics (excl. those for photographic and cinematographic film or for tapes, films and the like, for sound or video recordings or the recording of signals, da' &&
+                                          'ta or programmes)'.
+        WHEN '39239000'.  o_description = 'Articles for the conveyance or packaging of goods, of plastics (excl. boxes, cases, crates and similar articles; sacks and bags, incl. cones; carboys, bottles, flasks and similar articles; spools, spindles' &&
+                                          ', bobbins and similar supports; stoppers, lids, caps and other closures)'.
+        WHEN '39269097'.  o_description = 'Articles of plastics and articles of other materials of heading 3901 to 3914, n.e.s.'.
+        WHEN '44201900'.  o_description = 'Statuettes and other ornaments, of wood (excl. okoumé, obeche, sapelli, sipo, acajou d''Afrique, makoré, iroko, tiama, mansonia, ilomba, dibétou, limba, azobé, dark red meranti, light red meranti, meranti b' &&
+                                          'akau, white lauan, white meranti, white seraya, yellow meranti, alan, keruing, ramin, kapur, teak, jongkong, merbau, jelutong, kempas, virola, mahogany [Swietenia spp.], imbuia, balsa, palissandre de Rio, p' &&
+                                          'alissandre du Brésil and palissandre de Rose; wood marquetry and inlaid wood)'.
+        WHEN '48114120'.  o_description = 'Self-adhesive paper and paperboard, surface-coloured, surface-decorated or printed, in strips, rolls or sheets of a width of <= 10 cm, coated with unvulcanised natural or synthetic rubber'.
+        WHEN '48191000'.  o_description = 'Cartons, boxes and cases, of corrugated paper or paperboard'.
+        WHEN '48193000'.  o_description = 'Sacks and bags, of paper, paperboard, cellulose wadding or webs of cellulose fibres, having a base of a width of >= 40 cm'.
+        WHEN '48196000'.  o_description = 'Box files, letter trays, storage boxes and similar articles, of paperboard, of a kind used in offices, shops or the like (excl. packing containers)'.
+        WHEN '48201090'.  o_description = 'Writing pads and the like, of paper or paperboard'.
+        WHEN '48211090'.  o_description = 'Paper or paperboard labels of all kinds, printed (excl. self-adhesive)'.
+        WHEN '48219010'.  o_description = 'Self-adhesive paper or paperboard labels of all kinds, non-printed'.
+        WHEN '49111010'.  o_description = 'Printed catalogs, price lists or trade notices, relating to offers, by a person whose principal place of business or bonafide residence is in a foreign country, to sell or rent products of a foreign country'.
+        WHEN '49111090'.  o_description = 'Other printed trade advertising material, posters and the like'.
+        WHEN '49119100'.  o_description = 'Pictures, prints and photographs, n.e.s.'.
+        WHEN '61044300'.  o_description = 'Women''s or girls'' dresses of synthetic fibres, knitted or crocheted (excl. petticoats)'.
+        WHEN '61081100'.  o_description = 'Women''s or girls'' slips and petticoats of man-made fibres, knitted or crocheted (excl. T-shirts and vests)'.
+        WHEN '61082200'.  o_description = 'Women''s or girls'' briefs and panties'.
+        WHEN '61083100'.  o_description = 'Women''s or girls'' nightdresses and pyjamas of cotton, knitted or crocheted (excl. T-shirts, vests and négligés)'.
+        WHEN '61083200'.  o_description = 'Women''s or girls'' nightdresses and pyjamas of man-made fibres, knitted or crocheted (excl. T-shirts, vests and négligés)'.
+        WHEN '61089200'.  o_description = 'Women''s or girls'' négligés, bathrobes, dressing gowns, housejackets and similar articles of man-made fibres, knitted or crocheted (excl. vests, slips, petticoats, briefs and panties, nightdresses, pyjamas' &&
+                                          ', brassiéres, girdles, corsets and similar articles)'.
+        WHEN '61091000'.  o_description = 'T-shirts, singlets and other vests of cotton, knitted or crocheted'.
+        WHEN '61099020'.  o_description = 'T-shirts, singlets and other vests of wool or fine animal hair or man-made fibres, knitted or crocheted'.
+        WHEN '61099090'.  o_description = 'T-shirts, singlets and other vests of textile materials, knitted or crocheted (excl. of wool, fine animal hair, cotton or man-made fibres)'.
+        WHEN '61124190'.  o_description = 'Women''s or girls'' swimwear of synthetic fibres, knitted or crocheted (excl. containing >= 5% by weight of rubber thread)'.
+        WHEN '61143000'.  o_description = 'Special garments for professional, sporting or other purposes, n.e.s., of man-made fibres, knitted or crocheted'.
+        WHEN '62044200'.  o_description = 'Women''s or girls'' dresses of cotton (excl. knitted or crocheted and petticoats)'.
+        WHEN '62121090'.  o_description = 'Brassieres for ladies'.
+        WHEN '62122000'.  o_description = 'Girdles and panty girdles'.
+        WHEN '62123000'.  o_description = 'Corsets of man-made fibers'.
+        WHEN '62129000'.  o_description = 'Corsets, braces, garters, suspenders and similar articles and parts thereof, incl. parts of brassieres, girdles, panty girdles and corselettes, of all types of textile materials, whether or not elasticated' &&
+                                          ', incl. knitted or crocheted (excl. complete brassieres, girdles, panty girdles and corselettes)'.
+        WHEN '62143000'.  o_description = 'Shawls, scarves, mufflers, mantillas, veils and similar articles of synthetic fibres (excl. knitted or crocheted)'.
+        WHEN '62149000'.  o_description = 'Shawls, scarves, mufflers, mantillas, veils and similar articles of textile materials (excl. of silk, silk waste, wool, fine animal hair or man-made fibres, knitted or crocheted)'.
+        WHEN '63029390'.  o_description = 'Toilet linen and kitchen linen of man-made fibres (excl. nonwovens, floorcloths, polishing cloths, dishcloths and dusters)'.
+        WHEN '63059000'.  o_description = 'Sacks and bags, for the packing of goods, of textile materials (excl. man-made, cotton, jute or other textile bast fibres of heading 5303)'.
+        WHEN '63079098'.  o_description = 'Made-up articles of textile materials, incl. dress patterns, n.e.s. (excl. of felt, knitted or crocheted, single-use drapes used during surgical procedures made up of nonwovens, and protective face masks)'.
+        WHEN '90178010'.  o_description = 'Measuring rods and tapes and divided scales'.
+        WHEN '94032080'.  o_description = 'Metal furniture (excl. for offices, medical, surgical, dental or veterinary furniture, beds and seats)'.
+        WHEN '94036030'.  o_description = 'Wooden furniture for shops (excl. seats)'.
+    ENDCASE.
+    o_code = i_code.
+    RETURN.
+
+*   ...till better times:
+    DATA system_url TYPE string.
+
+    DATA i_username TYPE string VALUE 'INBOUND_USER'.
+    DATA i_password TYPE string VALUE 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
+
+    DATA text   TYPE string.
+    DATA s1     TYPE string.
+    DATA s2     TYPE string.
+    DATA s3     TYPE string.
+
+    TRY.
+
+* DATA(i_url) = 'https://my404898.s4hana.cloud.sap/sap/opu/odata/sap/YY1_COMMODITYCODE_CDS/YY1_COMMODITYCODE'.
+
+        system_url = cl_abap_context_info=>get_system_url( ).
+
+*       Read list of objects and get UUID of the first
+        CONCATENATE
+                'https://'
+                system_url(8) " my404898
+                '-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_COMMODITYCODE_CDS/YY1_COMMODITYCODE'
+            INTO DATA(i_url).
+
+        DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url = i_url ).
+
+        DATA(lo_http_client) = cl_web_http_client_manager=>create_by_http_destination( http_destination ).
+
+        lo_http_client->get_http_request( )->set_authorization_basic(
+            i_username = i_username
+            i_password = i_password
+        ).
+
+        DATA(lo_http_request) = lo_http_client->get_http_request( ).
+
+        DATA(lo_http_response) = lo_http_client->execute(
+            i_method   = if_web_http_client=>get
+        ).
+
+        text                          = lo_http_response->get_text( ).
+        DATA(status)                  = lo_http_response->get_status( ).
+        DATA(response_header_fields)  = lo_http_response->get_header_fields( ).
+
+        REPLACE '<d:SAP_UUID>'    IN text WITH '******'.
+        REPLACE '</d:SAP_UUID>'   IN text WITH '******'.
+        SPLIT text AT '******' INTO s1 s2 s3.
+
+        DATA(sap_uuid) = s2.
+
+        CONCATENATE
+                'https://'
+                system_url(8) " my404898
+                '-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_COMMODITYCODE_CDS/YY1_COMMODITYCODE'
+                '(guid''' sap_uuid ''')' " '91bf6b38-1c0f-1ede-b2cf-0d3f0b77f0ff'
+            INTO i_url.
+
+        http_destination = cl_http_destination_provider=>create_by_url( i_url = i_url ).
+
+        lo_http_client = cl_web_http_client_manager=>create_by_http_destination( http_destination ).
+
+        lo_http_client->get_http_request( )->set_authorization_basic(
+            i_username = i_username
+            i_password = i_password
+        ).
+
+        lo_http_request = lo_http_client->get_http_request( ).
+
+*       Get Token:
+
+        lo_http_request->set_header_field(
+            i_name  = 'x-csrf-token'
+            i_value = 'fetch'
+        ).
+
+        lo_http_response = lo_http_client->execute(
+            i_method   = if_web_http_client=>get
+        ).
+
+        text                   = lo_http_response->get_text( ).
+        status                 = lo_http_response->get_status( ).
+        response_header_fields = lo_http_response->get_header_fields( ).
+
+*        DATA token TYPE string.
+        READ TABLE response_header_fields WITH KEY name = 'x-csrf-token' INTO DATA(field).
+        IF ( sy-subrc = 0 ).
+            DATA(token) = field-value.
+        ENDIF.
+
+*       Update Code:
+
+        DATA i_fields TYPE if_web_http_request=>name_value_pairs.
+        APPEND VALUE #(
+            name  = 'x-csrf-token'
+            value = token " '5iGZK1qT45Vi4UfHYazbPQ=='
+        )
+        TO i_fields.
+        APPEND VALUE #(
+            name  = 'Content-Type'
+            value = 'application/json'
+        )
+        TO i_fields.
+
+        lo_http_request->set_header_fields(
+          EXPORTING
+            i_fields = i_fields
+        ).
+
+        lo_http_request->set_text(
+            i_text   = '{"CODE":"' && i_code && '"}' " '62149000'
+        ).
+
+        lo_http_response = lo_http_client->execute(
+            i_method   = if_web_http_client=>put
+        ).
+
+        text                      = lo_http_response->get_text( ).
+        status                    = lo_http_response->get_status( ).
+        response_header_fields    = lo_http_response->get_header_fields( ).
+
+*       Read Description
+
+        lo_http_response = lo_http_client->execute(
+            i_method   = if_web_http_client=>get
+        ).
+
+        text                    = lo_http_response->get_text( ).
+        status                  = lo_http_response->get_status( ).
+        response_header_fields  = lo_http_response->get_header_fields( ).
+
+        REPLACE '<d:CODE>'    IN text WITH '***CODE***'.
+        REPLACE '</d:CODE>'   IN text WITH '***CODE***'.
+        SPLIT text AT '***CODE***' INTO s1 s2 s3.
+        o_code = s2.
+
+        REPLACE '<d:DESCRIPTION>'    IN text WITH '***DESCRIPTION***'.
+        REPLACE '</d:DESCRIPTION>'   IN text WITH '***DESCRIPTION***'.
+        SPLIT text AT '***DESCRIPTION***' INTO s1 s2 s3.
+        o_description = s2.
+
+    CATCH cx_web_message_error INTO DATA(lx_web_message_error).
+      " Handle Exception
+*      RAISE SHORTDUMP lx_web_message_error.
+
+    CATCH cx_abap_context_info_error INTO DATA(lx_abap_context_info_error).
+      " Handle Exception
+*      RAISE SHORTDUMP lx_abap_context_info_error.
+
+    CATCH /iwbep/cx_cp_remote INTO DATA(lx_remote).
+      " Handle remote Exception
+*      RAISE SHORTDUMP lx_remote.
+
+    CATCH /iwbep/cx_gateway INTO DATA(lx_gateway).
+      " Handle Exception
+*      RAISE SHORTDUMP lx_gateway.
+
+    CATCH cx_web_http_client_error INTO DATA(lx_web_http_client_error).
+      " Handle Exception
+*      RAISE SHORTDUMP lx_web_http_client_error.
+
+    CATCH cx_http_dest_provider_error INTO DATA(lx_http_dest_provider_error).
+        "handle exception
+*      RAISE SHORTDUMP lx_http_dest_provider_error.
+
+    ENDTRY.
+
+  ENDMETHOD. " get_commodity_code_internal
 
 ENDCLASS. " lhc_shipment IMPLEMENTATION
 

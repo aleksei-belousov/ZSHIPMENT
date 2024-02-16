@@ -30,6 +30,7 @@ etag master LocalLastChangedAt
   // Events:
   determination on_create on modify { field ShipmentUUID; }
   determination on_modify_customer on modify { field PartyID; }
+  determination on_modify_recipient on modify { field ImportInvoiceRecipient; }
 
   // Associations:
   association _Available {  create ( features : instance, authorization : update ); with draft; }

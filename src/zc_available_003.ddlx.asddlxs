@@ -4,7 +4,7 @@
                   typeNamePlural: 'Outbound delivery',
                   title: { type: #STANDARD, label: 'Outbound delivery', value: 'AvailableUUID' } },
     presentationVariant: [{ sortOrder: [{ by: 'AvailableUUID', direction: #ASC }] }] }
-//@Search.searchable: true
+@Search.searchable: true
 
 annotate entity ZC_AVAILABLE_003 with 
 {
@@ -23,7 +23,9 @@ annotate entity ZC_AVAILABLE_003 with
     AvailableUUID;
 
     @UI: {  lineItem:       [ { position: 10, label: 'Item ID', cssDefault.width: '100px' } ],
-            identification: [ { position: 10, label: 'Item ID' } ] }
+            identification: [ { position: 10, label: 'Item ID' } ],
+            selectionField: [ { position: 10, exclude: true } ] }
+    @Search.defaultSearchElement 
     AvailableID;
 
     @UI.hidden: true
