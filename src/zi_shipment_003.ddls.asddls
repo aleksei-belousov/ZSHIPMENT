@@ -5,6 +5,7 @@
 define root view entity ZI_SHIPMENT_003 as select from zshipment003 as Shipment
 composition [0..*] of ZI_AVAILABLE_003 as _Available
 composition [0..*] of ZI_OUTBOUND_003 as _Outbound
+composition [0..*] of ZI_ATTACHMENT_003 as _Attachment
 association [0..1] to I_Customer as _Customer on $projection.SoldToParty = _Customer.Customer
 association [0..1] to I_BuPaIdentification as _BuPaIdentification on $projection.PartyID = _BuPaIdentification.BusinessPartner and _BuPaIdentification.BPIdentificationType = 'BUP005'
 {
@@ -31,6 +32,8 @@ association [0..1] to I_BuPaIdentification as _BuPaIdentification on $projection
     taxjurisdictioncode as TaxJurisdictionCode,
     streetpostalcode as StreetPostalCode,
     instructions as Instructions,
+    releasedate as ReleaseDate,
+    creationdate as CreationDate,    
     partyurl as PartyURL,
     importinvoicerecipienturl as ImportInvoiceRecipientURL,
 
@@ -42,6 +45,7 @@ association [0..1] to I_BuPaIdentification as _BuPaIdentification on $projection
 
     _Available, // Make association public
     _Outbound, // Make association public
+    _Attachment, // Make association public
     _Customer, // Make association public
     _BuPaIdentification // Make association public
 }

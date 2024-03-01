@@ -5,7 +5,9 @@
 define view entity ZC_AVAILABLE_003 as projection on ZI_AVAILABLE_003 as Available
 {
     key AvailableUUID,
-    AvailableID,
+
+    Selected,
+    //AvailableID,
     ShipmentUUID,
 
     @Consumption.valueHelpDefinition: [ { entity: { name: 'I_OutboundDeliveryTP', element: 'OutboundDelivery' },
@@ -13,9 +15,20 @@ define view entity ZC_AVAILABLE_003 as projection on ZI_AVAILABLE_003 as Availab
     @EndUserText.label: 'Outbound Delivery'
     OutboundDelivery,
 
-    OutboundDeliveryURL,
     _DeliveryDocument.UnloadingPointName as UnloadingPointName,
     _Shipment.SoldToParty as SoldToParty, 
+
+    _DeliveryDocument.CreationDate as CreationDate,
+    _DeliveryDocument.OverallGoodsMovementStatus as OverallGoodsMovementStatus,
+    _DeliveryDocument.OverallSDProcessStatus as OverallSDProcessStatus,
+    _DeliveryDocument.DeliveryDate as DeliveryDate,
+    _DeliveryDocument.DocumentDate as DocumentDate,
+
+    SalesOrder,
+    PurchaseOrderByCustomer,
+   
+    OutboundDeliveryURL,
+    SalesOrderURL, 
 
     CreatedBy,
     Createdat,

@@ -21,10 +21,13 @@ etag master LocalLastChangedAt
   draft action Discard /*with additional implementation*/;
 
   // Actions:
+  action retrieve;
+  action add;
+  action remove;
   action release;
-  action create_invoice;
-  action create_tkz_list;
-  action create_tariff_document;
+  action create_invoice; // pdf
+  action create_tkz_list; // pdf
+  action create_tariff_document; // pdf
   action create_eci; // csv
 
   // Events:
@@ -35,18 +38,24 @@ etag master LocalLastChangedAt
   // Associations:
   association _Available {  create ( features : instance, authorization : update ); with draft; }
   association _Outbound {  create ( features : instance, authorization : update ); with draft; }
+  association _Attachment {  create ( features : instance, authorization : update ); with draft; }
 
   field ( readonly, numbering : managed ) ShipmentUUID;
   field ( readonly ) ShipmentID;
+  field ( readonly ) ReleaseDate;
+  field ( readonly ) CreationDate;
 
   side effects
   {
-    action release affects field Released;
     field PartyID affects $self;
-    action create_tariff_document affects entity _Outbound;
-    action create_eci affects entity _Outbound;
-    action create_invoice affects entity _Outbound;
-    action create_tkz_list affects entity _Outbound;
+    action retrieve affects entity _Available;
+    action add affects entity _Available, entity _Outbound;
+    action remove affects entity _Available, entity _Outbound;
+    action release affects field Released, field ReleaseDate;
+    action create_tariff_document affects entity _Attachment;
+    action create_eci affects entity _Attachment;
+    action create_invoice affects entity _Attachment;
+    action create_tkz_list affects entity _Attachment;
   }
 
 }
@@ -72,8 +81,15 @@ etag master LocalLastChangedAt
 
   field ( readonly, numbering : managed ) AvailableUUID;
   field ( readonly ) ShipmentUUID;
-  field ( readonly ) AvailableID;
+  //field ( readonly ) AvailableID;
+  field ( readonly ) OutboundDelivery;
+  field ( readonly ) SalesOrder;
+  field ( readonly ) PurchaseOrderByCustomer;
 
+  side effects
+  {
+    field OutboundDelivery affects $self;
+  }
 }
 
 
@@ -90,6 +106,7 @@ etag master LocalLastChangedAt
 
   // Events:
   determination on_outbound_create on modify { field OutboundUUID; }
+  determination on_outbound_delivery_modify on modify { field OutboundDelivery; }
 
   // Associations:
   association _Shipment { with draft; }
@@ -97,5 +114,35 @@ etag master LocalLastChangedAt
   field ( readonly, numbering : managed ) OutboundUUID;
   field ( readonly ) ShipmentUUID;
   field ( readonly ) OutboundID;
+  //field ( readonly ) OutboundDelivery;
+  field ( readonly ) SalesOrder;
+  field ( readonly ) PurchaseOrderByCustomer;
+
+  side effects
+  {
+    field OutboundDelivery affects $self;
+  }
+}
+
+define behavior for ZI_ATTACHMENT_003 alias Attachment
+persistent table zattachment003
+draft table zattachment003d
+lock dependent by _Shipment
+authorization dependent by _Shipment
+etag master LocalLastChangedAt
+{
+
+  update;
+  delete;
+
+  // Events:
+  determination on_attachment_create on modify { field AttachmentUUID; }
+
+  // Associations:
+  association _Shipment { with draft; }
+
+  field ( readonly, numbering : managed ) AttachmentUUID;
+  field ( readonly ) ShipmentUUID;
+  field ( readonly ) AttachmentID;
 
 }

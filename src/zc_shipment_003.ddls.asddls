@@ -41,7 +41,10 @@ define root view entity ZC_SHIPMENT_003 provider contract transactional_query as
     CountryCode,
     TaxJurisdictionCode,
     StreetPostalCode,
-    Instructions, 
+    Instructions,
+    ReleaseDate,
+    CreationDate,
+         
     PartyURL,
     ImportInvoiceRecipientURL,
     
@@ -56,6 +59,7 @@ define root view entity ZC_SHIPMENT_003 provider contract transactional_query as
     /* Associations */
     _Available: redirected to composition child ZC_AVAILABLE_003,
     _Outbound: redirected to composition child ZC_OUTBOUND_003,
+    _Attachment: redirected to composition child ZC_ATTACHMENT_003,
     _Customer,
     _BuPaIdentification // Make association public
 

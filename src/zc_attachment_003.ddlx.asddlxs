@@ -1,0 +1,57 @@
+@Metadata.layer: #CORE
+@UI: {
+    headerInfo: { typeName: 'Attachment',
+                  typeNamePlural: 'Attachments',
+                  title: { type: #STANDARD, label: 'Attachments', value: 'AttachmentUUID' } },
+    presentationVariant: [{ sortOrder: [{ by: 'AttachmentUUID', direction: #ASC }] }] }
+//@Search.searchable: true
+
+annotate entity ZC_ATTACHMENT_003 with 
+{
+
+    @UI.facet: [
+        {
+            id:            'Attachment',
+            purpose:       #STANDARD,
+            type:          #IDENTIFICATION_REFERENCE,
+            label:         'Attachment',
+            position:      10
+        }
+    ]
+
+    @UI.hidden: true
+    AttachmentUUID;
+
+    @UI: {  lineItem:       [ { position: 10, label: 'ID', cssDefault.width: '100px' } ],
+            identification: [ { position: 10, label: 'ID' } ] }
+    AttachmentID;
+
+    @UI.hidden: true
+    ShipmentUUID;
+
+    @UI: {  lineItem:       [ { position: 20, label: 'Attachment', cssDefault.width: '100px' } ],
+            identification: [ { position: 20, label: 'Attachment' } ] }
+    Attachment;
+
+    @UI.hidden: true
+    MimeType;
+
+    @UI.hidden: true
+    FileName;
+
+    @UI.hidden: true
+    Createdby;
+
+    @UI.hidden: true
+    Createdat;
+
+    @UI.hidden: true
+    Lastchangedby;
+
+    @UI.hidden: true
+    Lastchangedat;
+
+    @UI.hidden: true
+    Locallastchangedat;
+
+}

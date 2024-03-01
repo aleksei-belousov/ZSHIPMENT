@@ -1,20 +1,20 @@
 @Metadata.layer: #CORE
 @UI: {
-    headerInfo: { typeName: 'Attachments',
-                  typeNamePlural: 'Attachments',
-                  title: { type: #STANDARD, label: 'Attachments', value: 'OutboundUUID' } },
+    headerInfo: { typeName: 'outbound delivery',
+                  typeNamePlural: 'outbound deliveries',
+                  title: { type: #STANDARD, label: 'outbound deliveries', value: 'OutboundUUID' } },
     presentationVariant: [{ sortOrder: [{ by: 'OutboundUUID', direction: #ASC }] }] }
-//@Search.searchable: true
+@Search.searchable: true
 
 annotate entity ZC_OUTBOUND_003 with 
 {
 
     @UI.facet: [
         {
-            id:            'Attachments',
+            id:            'Outbound',
             purpose:       #STANDARD,
             type:          #IDENTIFICATION_REFERENCE,
-            label:         'Attachments',
+            label:         'Outbound',
             position:      10
         }
     ]
@@ -22,22 +22,79 @@ annotate entity ZC_OUTBOUND_003 with
     @UI.hidden: true
     OutboundUUID;
 
-    @UI: {  lineItem:       [ { position: 10, label: 'ID', cssDefault.width: '100px' } ],
-            identification: [ { position: 10, label: 'ID' } ] }
+    @UI: {  lineItem:       [ { position: 10, label: 'To Remove', cssDefault.width: '50px' } ],
+            identification: [ { position: 10, label: 'To Remove' } ] }
+    @EndUserText.label: 'To Remove'
+//    @UI.hidden: true
+    Selected;
+
+    @UI: {  lineItem:       [ { position: 20, label: 'Item ID', cssDefault.width: '100px' } ],
+            identification: [ { position: 20, label: 'Item ID' } ] }
+    @UI.hidden: true
     OutboundID;
 
     @UI.hidden: true
     ShipmentUUID;
 
-    @UI: {  lineItem:       [ { position: 20, label: 'Attachment', cssDefault.width: '100px' } ],
-            identification: [ { position: 20, label: 'Attachment' } ] }
-    Attachment;
+    @UI: {  lineItem:       [ { position: 30, label: 'Outbound Delivery', cssDefault.width: '100px', type: #WITH_URL, url: 'OutboundDeliveryURL' } ],
+            identification: [ { position: 30, label: 'Outbound Delivery', type: #WITH_URL, url: 'OutboundDeliveryURL' } ] }
+    @EndUserText.label: 'Outbound Delivery'
+    @Search.defaultSearchElement 
+//    @UI.hidden: true
+    OutboundDelivery;
+
+    @UI: {  lineItem:       [ { position: 40, label: 'Sold To Party', cssDefault.width: '200px' } ],
+            identification: [ { position: 40, label: 'Sold To Party' } ] }
+    @EndUserText.label: 'Sold To Party'
+    @UI.hidden: true
+    SoldToParty;
+ 
+    @UI: {  lineItem:       [ { position: 40, label: 'Number of Packages', cssDefault.width: '150px' } ],
+            identification: [ { position: 40, label: 'Number of Packages' } ] }
+    @EndUserText.label: 'Number of Packages'
+    UnloadingPointName;
+
+    @UI: {  lineItem:       [ { position: 50, label: 'Creation Date', cssDefault.width: '150px' } ],
+            identification: [ { position: 50, label: 'Creation Date' } ] }
+    @EndUserText.label: 'Creation Date'
+    CreationDate;
+
+    @UI: {  lineItem:       [ { position: 60, label: 'Delivery Date', cssDefault.width: '150px' } ],
+            identification: [ { position: 60, label: 'Delivery Date' } ] }
+    @EndUserText.label: 'Delivery Date'
+    DeliveryDate;
+
+    @UI: {  lineItem:       [ { position: 70, label: 'Document Date', cssDefault.width: '150px' } ],
+            identification: [ { position: 70, label: 'Document Date' } ] }
+    @EndUserText.label: 'Document Date'
+    DocumentDate;
+
+    @UI: {  lineItem:       [ { position: 80, label: 'Overall Goods Movement Status', cssDefault.width: '150px' } ],
+            identification: [ { position: 80, label: 'Overall Goods Movement Status' } ] }
+    @EndUserText.label: 'Overall Goods Movement Status'
+    @UI.hidden: true
+    OverallGoodsMovementStatus;
+
+    @UI: {  lineItem:       [ { position: 90, label: 'Overall SD Process Status', cssDefault.width: '150px' } ],
+            identification: [ { position: 90, label: 'Overall SD Process Status' } ] }
+    @EndUserText.label: 'Overall SD Process Status'
+    @UI.hidden: true
+    OverallSDProcessStatus;
+
+    @UI: {  lineItem:       [ { position: 100, label: 'SalesOrder', cssDefault.width: '150px', type: #WITH_URL, url: 'SalesOrderURL' } ],
+            identification: [ { position: 100, label: 'SalesOrder', type: #WITH_URL, url: 'SalesOrderURL' } ] }
+    @EndUserText.label: 'SalesOrder'
+    //@UI.hidden: true
+    SalesOrder;
+
+    @UI: {  lineItem:       [ { position: 110, label: 'Customer Reference', cssDefault.width: '150px' } ],
+            identification: [ { position: 110, label: 'Customer Reference' } ] }
+    @EndUserText.label: 'Customer Reference'
+    //@UI.hidden: true
+    PurchaseOrderByCustomer;
 
     @UI.hidden: true
-    MimeType;
-
-    @UI.hidden: true
-    FileName;
+    OutboundDeliveryURL;
 
     @UI.hidden: true
     Createdby;

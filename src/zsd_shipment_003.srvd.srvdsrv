@@ -3,4 +3,5 @@ define service ZSD_SHIPMENT_003 {
   expose ZC_SHIPMENT_003;
   expose ZC_AVAILABLE_003;
   expose ZC_OUTBOUND_003;
+  expose ZC_ATTACHMENT_003;
 }

@@ -18,25 +18,35 @@ annotate entity ZC_SHIPMENT_003 with
             label:         'Shipment',
             position:      10
         },
-        // Outbound delivery
+        // Outbound delivery (available)
         {
             hidden:       false,
-            label:        'Outbound delivery',
+            label:        'Available',
             id:           'AvailableUUID',
             purpose:      #STANDARD,
             type:         #LINEITEM_REFERENCE,
             position:     20,
             targetElement: '_Available'
          },
-        // Attachments
+        // Outbound delivery (added)
         {
             hidden:       false,
-            label:        'Attachments',
+            label:        'Added',
             id:           'OutboundUUID',
             purpose:      #STANDARD,
             type:         #LINEITEM_REFERENCE,
             position:     30,
             targetElement: '_Outbound'
+         },
+        // Attachment
+        {
+            hidden:       false,
+            label:        'Attachment:',
+            id:           'AttachmentUUID',
+            purpose:      #STANDARD,
+            type:         #LINEITEM_REFERENCE,
+            position:     30,
+            targetElement: '_Attachment'
          }
     ]
 
@@ -45,88 +55,101 @@ annotate entity ZC_SHIPMENT_003 with
 
     @UI: {  lineItem:       [ { position: 20, label: 'Shipment ID', cssDefault.width: '200px' } ],
             identification: [ { position: 20, label: 'Shipment ID' }, 
-                              { type: #FOR_ACTION, dataAction: 'create_invoice',            label: 'Create Invoice',        position: 1 },
-                              { type: #FOR_ACTION, dataAction: 'create_tkz_list',           label: 'Create TKZ List',       position: 2 },
-                              { type: #FOR_ACTION, dataAction: 'create_tariff_document',    label: 'Create Tariff Document',position: 3 },
-                              { type: #FOR_ACTION, dataAction: 'create_eci',                label: 'Create ECI csv',        position: 4 },
-                              { type: #FOR_ACTION, dataAction: 'release',                   label: 'Release',               position: 5 } ] }
+                              { type: #FOR_ACTION, dataAction: 'retrieve',                  label: 'Retrieve',              position: 1 },
+                              { type: #FOR_ACTION, dataAction: 'add',                       label: 'Add',                   position: 2 },
+                              { type: #FOR_ACTION, dataAction: 'remove',                    label: 'Remove',                position: 3 },
+                              { type: #FOR_ACTION, dataAction: 'release',                   label: 'Release',               position: 4 },
+                              { type: #FOR_ACTION, dataAction: 'create_invoice',            label: 'Create Invoice',        position: 5 },
+                              { type: #FOR_ACTION, dataAction: 'create_tkz_list',           label: 'Create TKZ List',       position: 6 },
+                              { type: #FOR_ACTION, dataAction: 'create_tariff_document',    label: 'Create Tariff Document',position: 7 },
+                              { type: #FOR_ACTION, dataAction: 'create_eci',                label: 'Create ECI csv',        position: 8 } ] }
+    @EndUserText.label: 'Shipment ID'
     //@Search.defaultSearchElement 
     ShipmentID;
 
     @UI: {  lineItem:       [ { position: 40, label: 'Sold To Party', cssDefault.width: '200px' } ],
             identification: [ { position: 40, label: 'Sold To Party' } ] }
+    @EndUserText.label: ''
     @UI.hidden: true
     SoldToParty;
-
-    @UI: {  lineItem:       [ { position: 50, label: 'Released', cssDefault.width: '200px' } ],
-            identification: [ { position: 50, label: 'Released' } ]/*,
-            selectionField: [ { position: 50, exclude: true } ]*/ }
-    //@Search.defaultSearchElement: true 
-    Released;
-
-    @UI: {  lineItem:       [ { position: 60, label: 'Confirmation Date', cssDefault.width: '200px' } ],
-            identification: [ { position: 60, label: 'Confirmation Date' } ] }
-    ConfirmationDate;
-
+    
+    @UI.hidden: true
+    CustomerName;
+    
     @UI: {  lineItem:       [ { position: 70, label: 'Shipment Group', cssDefault.width: '200px', type: #WITH_URL, url: 'PartyURL' } ],
             identification: [ { position: 70, label: 'Shipment Group', type: #WITH_URL, url: 'PartyURL' } ] }
+    @EndUserText.label: 'Shipment Group'
     PartyID;
 
     @UI: {  lineItem:       [ { position: 80, label: 'Import Invoice Recipient', cssDefault.width: '200px', type: #WITH_URL, url: 'ImportInvoiceRecipientURL' } ],
             identification: [ { position: 80, label: 'Import Invoice Recipient', type: #WITH_URL, url: 'ImportInvoiceRecipientURL' } ] }
+    @EndUserText.label: 'Import Invoice Recipient'
     @UI.hidden: true
     ImportInvoiceRecipient; 
 
     @UI: {  lineItem:       [ { position: 90, label: 'Tour', cssDefault.width: '200px' } ],
             identification: [ { position: 90, label: 'Tour' } ] }
+    @EndUserText.label: 'Tour'
     Tour;
 
     @UI: {  lineItem:       [ { position: 100, label: 'Transportation Type', cssDefault.width: '200px' } ],
             identification: [ { position: 100, label: 'Transportation Type' } ] }
+    @EndUserText.label: 'Transportation Type'
     TransportationType; 
 
     @UI: {  lineItem:       [ { position: 110, label: 'Freight Forwarder Client', cssDefault.width: '200px' } ],
             identification: [ { position: 110, label: 'Freight Forwarder Client' } ] }
+    @EndUserText.label: 'Freight Forwarder Client'
     FreightForwarderClient;
 
     @UI: {  lineItem:       [ { position: 120, label: 'Organisation Formatted Name 1', cssDefault.width: '200px' } ],
             identification: [ { position: 120, label: 'Organisation Formatted Name 1' } ] }
+    @EndUserText.label: 'Organisation Formatted Name 1'
     OrganisationFormattedName1;
 
     @UI: {  lineItem:       [ { position: 130, label: 'Organisation Formatted Name 2', cssDefault.width: '200px' } ],
             identification: [ { position: 130, label: 'Organisation Formatted Name 2' } ] }
+    @EndUserText.label: 'Organisation Formatted Name 2'
     OrganisationFormattedName2;
 
     @UI: {  lineItem:       [ { position: 140, label: 'Organisation Formatted Name 3', cssDefault.width: '200px' } ],
             identification: [ { position: 140, label: 'Organisation Formatted Name 3' } ] }
+    @EndUserText.label: 'Organisation Formatted Name 3'
     OrganisationFormattedName3;
 
     @UI: {  lineItem:       [ { position: 150, label: 'Organisation Formatted Name 4', cssDefault.width: '200px' } ],
             identification: [ { position: 150, label: 'Organisation Formatted Name 4' } ] }
+     @EndUserText.label: 'Organisation Formatted Name 4'
     OrganisationFormattedName4;
 
     @UI: {  lineItem:       [ { position: 160, label: 'Street Name', cssDefault.width: '200px' } ],
             identification: [ { position: 160, label: 'Street Name' } ] }
+     @EndUserText.label: 'Street Name'
     StreetName;
 
     @UI: {  lineItem:       [ { position: 170, label: 'House ID', cssDefault.width: '200px' } ],
             identification: [ { position: 170, label: 'House ID' } ] }
+    @EndUserText.label: 'House ID'
     HouseID;
 
     @UI: {  lineItem:       [ { position: 180, label: 'City Name', cssDefault.width: '200px' } ],
             identification: [ { position: 180, label: 'City Name' } ] }
+    @EndUserText.label: 'City Name'
     CityName;
 
     @UI: {  lineItem:       [ { position: 190, label: 'Country Code', cssDefault.width: '200px' } ],
             identification: [ { position: 190, label: 'Country Code' } ] }
+    @EndUserText.label: 'Country Code'
     CountryCode;
 
     @UI: {  lineItem:       [ { position: 200, label: 'Tax Jurisdiction Code', cssDefault.width: '200px' } ],
             identification: [ { position: 200, label: 'Tax Jurisdiction Code' } ] }
+    @EndUserText.label: 'Tax Jurisdiction Code'
     TaxJurisdictionCode;
 
     @UI: {  lineItem:       [ { position: 210, label: 'Street Postal Code', cssDefault.width: '200px' } ],
             identification: [ { position: 210, label: 'Street Postal Code' } ] }
+    @EndUserText.label: 'Street Postal Code'
     StreetPostalCode;
 
     @UI: {  lineItem:       [ { position: 220, label: 'Instructions', cssDefault.width: '200px' } ],
@@ -135,7 +158,33 @@ annotate entity ZC_SHIPMENT_003 with
 
     @UI: {  lineItem:       [ { position: 230, label: 'GLN', cssDefault.width: '200px' } ],
             identification: [ { position: 230, label: 'GLN' } ] }
+    @EndUserText.label: 'GLN'
     BPIdentificationNumber;
+
+    @UI: {  lineItem:       [ { position: 240, label: 'Creation Date', cssDefault.width: '200px' } ],
+            identification: [ { position: 240, label: 'Creation Date' } ] }
+    @EndUserText.label: 'Creation Date'
+    //@UI.hidden: true
+    CreationDate;
+    
+    @UI: {  lineItem:       [ { position: 250, label: 'Release Date', cssDefault.width: '200px' } ],
+            identification: [ { position: 250, label: 'Release Date' } ] }
+    @EndUserText.label: 'Release Date'
+    //@UI.hidden: true
+    ReleaseDate;
+
+    @UI: {  lineItem:       [ { position: 260, label: 'Confirmation Date', cssDefault.width: '200px' } ],
+            identification: [ { position: 260, label: 'Confirmation Date' } ] }
+    @EndUserText.label: 'Confirmation Date'
+    ConfirmationDate;
+
+    @UI: {  lineItem:       [ { position: 270, label: 'Released', cssDefault.width: '200px' } ],
+            identification: [ { position: 270, label: 'Released' } ] }
+//    @UI.hidden: true
+    Released;
+
+    @UI.hidden: true
+    ImportInvoiceRecipientURL;
 
     @UI.hidden: true
     PartyURL;

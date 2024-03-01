@@ -15,18 +15,30 @@ define behavior for ZC_SHIPMENT_003 alias Shipment
   use action Discard;
   use action Prepare;
 
+  use action add;
+  use action remove;
+  use action retrieve;
   use action release;
-  use action create_invoice;
-  use action create_tkz_list;
-  use action create_tariff_document;
+  use action create_invoice; // pdf
+  use action create_tkz_list; // pdf
+  use action create_tariff_document; // pdf
   use action create_eci; // csv
 
-  use association _Available { create; with draft;}
+  use association _Available { /*create; */ with draft;}
   use association _Outbound { create; with draft;}
+  use association _Attachment { create; with draft;}
 
 }
 
 define behavior for ZC_AVAILABLE_003 alias Available
+{
+  use update;
+  //use delete;
+
+  use association _Shipment { with draft; }
+}
+
+define behavior for ZC_OUTBOUND_003 alias Outbound
 {
   use update;
   use delete;
@@ -34,7 +46,7 @@ define behavior for ZC_AVAILABLE_003 alias Available
   use association _Shipment { with draft; }
 }
 
-define behavior for ZC_OUTBOUND_003 alias Outbound
+define behavior for ZC_ATTACHMENT_003 alias Attachment
 {
   use update;
   use delete;

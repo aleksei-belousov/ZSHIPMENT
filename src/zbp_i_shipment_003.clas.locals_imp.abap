@@ -17,9 +17,6 @@ CLASS lhc_shipment DEFINITION INHERITING FROM cl_abap_behavior_handler.
     METHODS Resume FOR MODIFY
       IMPORTING keys FOR ACTION Shipment~Resume.
 
-    METHODS release FOR MODIFY
-      IMPORTING keys FOR ACTION Shipment~release.
-
     METHODS on_create FOR DETERMINE ON MODIFY
       IMPORTING keys FOR Shipment~on_create.
 
@@ -37,8 +34,16 @@ CLASS lhc_shipment DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
     METHODS create_eci FOR MODIFY
       IMPORTING keys FOR ACTION Shipment~create_eci.
-    METHODS on_modify_recipient FOR DETERMINE ON MODIFY
-      IMPORTING keys FOR Shipment~on_modify_recipient.
+
+    METHODS on_modify_recipient FOR DETERMINE ON MODIFY IMPORTING keys FOR Shipment~on_modify_recipient.
+
+    METHODS retrieve FOR MODIFY IMPORTING keys FOR ACTION Shipment~retrieve.
+
+    METHODS release FOR MODIFY  IMPORTING keys FOR ACTION Shipment~release.
+
+    METHODS add FOR MODIFY IMPORTING keys FOR ACTION Shipment~add.
+
+    METHODS remove FOR MODIFY IMPORTING keys FOR ACTION Shipment~remove.
 
 ******** Internal Methods *********
 
@@ -54,7 +59,11 @@ CLASS lhc_shipment DEFINITION INHERITING FROM cl_abap_behavior_handler.
     METHODS get_address_internal
       IMPORTING VALUE(i_customer)                       TYPE string
       EXPORTING VALUE(o_street_name)                    TYPE string
-                VALUE(o_house_number)                   TYPE string.
+                VALUE(o_house_number)                   TYPE string
+                VALUE(o_address_line1)                  TYPE string
+                VALUE(o_address_line2)                  TYPE string
+                VALUE(o_address_line3)                  TYPE string
+                VALUE(o_address_line4)                  TYPE string.
 
     METHODS get_forwarding_rule_internal
       IMPORTING VALUE(i_forwarding_rule_id)             TYPE string
@@ -109,12 +118,14 @@ CLASS lhc_shipment IMPLEMENTATION.
             SELECT MAX( shipmentid ) FROM zi_shipment_003 INTO (@shipmentid).
             shipmentid  = ( shipmentid + 1 ).
 
+            <entity>-CreationDate = cl_abap_context_info=>get_system_date( ).
             MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
                 ENTITY Shipment
-                UPDATE FIELDS ( ShipmentID )
+                UPDATE FIELDS ( ShipmentID CreationDate )
                 WITH VALUE #( (
-                    %tky        = <entity>-%tky
-                    ShipmentID  = shipmentid
+                    %tky            = <entity>-%tky
+                    ShipmentID      = ShipmentID
+                    CreationDate    = <entity>-CreationDate
                 ) )
                 FAILED DATA(ls_failed1)
                 MAPPED DATA(ls_mapped1)
@@ -131,6 +142,154 @@ CLASS lhc_shipment IMPLEMENTATION.
 
   METHOD Resume.
   ENDMETHOD. " Resume
+
+  METHOD add. " on pressing Add button
+
+    DATA it_available_delete    TYPE TABLE FOR DELETE zi_shipment_003\\Available.
+    DATA it_outbound_create     TYPE TABLE FOR CREATE zi_shipment_003\_Outbound.
+
+    " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Shipment
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-Released = abap_true ).
+*           Short format message
+            APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'Shipment Binding is already released.' ) ) TO reported-shipment.
+            RETURN.
+        ENDIF.
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+        ENDIF.
+        IF ( <entity>-%is_draft = '01' ). " Draft
+        ENDIF.
+
+*       Read Available
+        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment BY \_Available
+            ALL FIELDS WITH VALUE #( (
+                %tky = <entity>-%tky
+            ) )
+            RESULT DATA(availables)
+            FAILED DATA(failed1)
+            REPORTED DATA(reported1).
+
+        DATA available LIKE LINE OF availables.
+        LOOP AT availables INTO available WHERE ( Selected = abap_true ).
+            APPEND VALUE #(
+                %tky = <entity>-%tky
+                %target = VALUE #( (
+                    %cid                = sy-tabix
+                    %is_draft           = <entity>-%is_draft
+                    ShipmentUUID        = <entity>-ShipmentUUID
+                    OutboundDelivery    = available-OutboundDelivery
+                ) )
+            ) TO it_outbound_create.
+        ENDLOOP.
+
+*       Create Outbound
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment
+            CREATE BY \_Outbound
+            FIELDS ( ShipmentUUID OutboundDelivery )
+            WITH it_outbound_create
+            MAPPED DATA(mapped2)
+            FAILED DATA(failed2)
+            REPORTED DATA(reported2).
+
+        LOOP AT availables INTO available WHERE ( Selected = abap_true ).
+            APPEND VALUE #( %tky = available-%tky ) TO it_available_delete.
+        ENDLOOP.
+
+*       Delete Available
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Available
+            DELETE FROM it_available_delete
+            FAILED DATA(failed3)
+            MAPPED DATA(mapped3)
+            REPORTED DATA(reported3).
+
+    ENDLOOP.
+
+  ENDMETHOD. " add
+
+  METHOD remove. " on pressing Remove button
+
+    DATA it_outbound_delete    TYPE TABLE FOR DELETE zi_shipment_003\\Outbound.
+    DATA it_available_create   TYPE TABLE FOR CREATE zi_shipment_003\_Available.
+
+    " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Shipment
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-Released = abap_true ).
+*           Short format message
+            APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'Shipment Binding is already released.' ) ) TO reported-shipment.
+            RETURN.
+        ENDIF.
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+        ENDIF.
+        IF ( <entity>-%is_draft = '01' ). " Draft
+        ENDIF.
+
+*       Read Outbound
+        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment BY \_Outbound
+            ALL FIELDS WITH VALUE #( (
+                %tky = <entity>-%tky
+            ) )
+            RESULT DATA(outbounds)
+            FAILED DATA(failed1)
+            REPORTED DATA(reported1).
+
+        DATA outbound LIKE LINE OF outbounds.
+        LOOP AT outbounds INTO outbound WHERE ( Selected = abap_true ).
+            APPEND VALUE #(
+                %tky = <entity>-%tky
+                %target = VALUE #( (
+                    %cid                = sy-tabix
+                    %is_draft           = <entity>-%is_draft
+                    ShipmentUUID        = <entity>-ShipmentUUID
+                    OutboundDelivery    = outbound-OutboundDelivery
+                ) )
+            ) TO it_available_create.
+        ENDLOOP.
+
+*       Create Available
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment
+            CREATE BY \_Available
+            FIELDS ( ShipmentUUID OutboundDelivery )
+            WITH it_available_create
+            MAPPED DATA(mapped2)
+            FAILED DATA(failed2)
+            REPORTED DATA(reported2).
+
+        LOOP AT outbounds INTO outbound WHERE ( Selected = abap_true ).
+            APPEND VALUE #( %tky = outbound-%tky ) TO it_outbound_delete.
+        ENDLOOP.
+
+*       Delete Outbound
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Outbound
+            DELETE FROM it_outbound_delete
+            FAILED DATA(failed3)
+            MAPPED DATA(mapped3)
+            REPORTED DATA(reported3).
+
+    ENDLOOP.
+
+  ENDMETHOD. " remove
 
   METHOD release. " on Pressing Release button
 
@@ -154,41 +313,41 @@ CLASS lhc_shipment IMPLEMENTATION.
 *           Outbound Delivery
             READ ENTITIES OF zi_shipment_003  IN LOCAL MODE
                 ENTITY Shipment
-                BY \_Available
-                ALL FIELDS WITH VALUE #( (
-                    %tky = <entity>-%tky
-                ) )
-                RESULT DATA(lt_available)
-                FAILED DATA(failed1)
-                REPORTED DATA(reported1).
-
-            IF ( lt_available[] IS INITIAL ).
-*               Short format message
-                APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'No Outbould Deliveres.' ) ) TO reported-shipment.
-                RETURN.
-            ENDIF.
-
-            SORT lt_available STABLE BY OutboundDelivery.
-
-
-*           Attachments
-            READ ENTITIES OF zi_shipment_003  IN LOCAL MODE
-                ENTITY Shipment
                 BY \_Outbound
                 ALL FIELDS WITH VALUE #( (
                     %tky = <entity>-%tky
                 ) )
                 RESULT DATA(lt_outbound)
+                FAILED DATA(failed1)
+                REPORTED DATA(reported1).
+
+            IF ( lt_outbound[] IS INITIAL ).
+*               Short format message
+                APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'No Outbould Delivery added.' ) ) TO reported-shipment.
+                RETURN.
+            ENDIF.
+
+            SORT lt_outbound STABLE BY OutboundDelivery.
+
+
+*           Attachments
+            READ ENTITIES OF zi_shipment_003  IN LOCAL MODE
+                ENTITY Shipment
+                BY \_Attachment
+                ALL FIELDS WITH VALUE #( (
+                    %tky = <entity>-%tky
+                ) )
+                RESULT DATA(lt_attachment)
                 FAILED DATA(failed2)
                 REPORTED DATA(reported2).
 
-            IF ( lt_outbound[] IS INITIAL ).
+            IF ( lt_attachment[] IS INITIAL ).
 *               Short format message
 *                APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'No Attachment.' ) ) TO reported-shipment.
 *                RETURN.
             ENDIF.
 
-            SORT lt_outbound STABLE BY OutboundID.
+            SORT lt_attachment STABLE BY AttachmentID.
 
             SELECT SINGLE BPIdentificationNumber FROM zc_shipment_003 WHERE ( ShipmentUUID = @<entity>-ShipmentUUID ) INTO @DATA(bpIdentificationNumber).
 
@@ -215,32 +374,32 @@ CLASS lhc_shipment IMPLEMENTATION.
             request_body = request_body && '<StreetPostalCode>' && <entity>-StreetPostalCode && '</StreetPostalCode>' && cl_abap_char_utilities=>cr_lf.
             request_body = request_body && '<Instructions>' && <entity>-Instructions && '</Instructions>' && cl_abap_char_utilities=>cr_lf.
 
-            DATA availableID        TYPE string.
+            DATA outboundID         TYPE string.
             DATA outboundDelivery   TYPE string..
-            LOOP AT lt_available INTO DATA(ls_available).
-                availableID         = |{ ls_available-AvailableID ALPHA = OUT }|.
-                outboundDelivery    = |{ ls_available-OutboundDelivery ALPHA = IN }|.
-                SELECT SINGLE UnloadingPointName FROM zc_available_003 WHERE ( AvailableUUID = @ls_available-availableUUID ) INTO @DATA(unloadingPointName).
+            LOOP AT lt_outbound INTO DATA(ls_outbound).
+                outboundID          = |{ ls_outbound-OutboundID ALPHA = OUT }|.
+                outboundDelivery    = |{ ls_outbound-OutboundDelivery ALPHA = IN }|.
+                SELECT SINGLE UnloadingPointName FROM zc_outbound_003 WHERE ( OutboundUUID = @ls_outbound-OutboundUUID ) INTO @DATA(unloadingPointName).
                 request_body = request_body && '<OutboundDelivery>' && cl_abap_char_utilities=>cr_lf.
-                request_body = request_body && '<ItemID>' && availableID && '</ItemID>' && cl_abap_char_utilities=>cr_lf.
+                request_body = request_body && '<ItemID>' && outboundID && '</ItemID>' && cl_abap_char_utilities=>cr_lf.
                 request_body = request_body && '<ID>' && outboundDelivery && '</ID>' && cl_abap_char_utilities=>cr_lf.
                 request_body = request_body && '<NumberOfPackages>' && unloadingPointName && '</NumberOfPackages>' && cl_abap_char_utilities=>cr_lf.
                 request_body = request_body && '</OutboundDelivery>' && cl_abap_char_utilities=>cr_lf.
             ENDLOOP.
 
-            DATA outboundID TYPE string.
-            DATA fileName   TYPE string.
-            DATA mimeType   TYPE string.
-            DATA base64     TYPE string.
-            LOOP AT lt_outbound INTO DATA(ls_outbound).
-                outboundID      = |{ ls_outbound-OutboundID ALPHA = OUT }|.
-                CONDENSE outboundID NO-GAPS.
-                fileName        = ls_outbound-FileName.
-                mimeType        = ls_outbound-MimeType.
-                SELECT SINGLE attachment FROM zc_outbound_003 WHERE ( OutboundUUID = @ls_outbound-OutboundUUID ) INTO @DATA(attachment).
+            DATA attachmentID   TYPE string.
+            DATA fileName       TYPE string.
+            DATA mimeType       TYPE string.
+            DATA base64         TYPE string.
+            LOOP AT lt_attachment INTO DATA(ls_attachment).
+                attachmentID      = |{ ls_attachment-AttachmentID ALPHA = OUT }|.
+                CONDENSE attachmentID NO-GAPS.
+                fileName        = ls_attachment-FileName.
+                mimeType        = ls_attachment-MimeType.
+                SELECT SINGLE attachment FROM zc_attachment_003 WHERE ( AttachmentUUID = @ls_attachment-AttachmentUUID ) INTO @DATA(attachment).
                 base64       = cl_web_http_utility=>encode_x_base64( attachment ). " convert Xstring (binary) into Base64 (string)
                 request_body = request_body && '<Attachment>' && cl_abap_char_utilities=>cr_lf.
-                request_body = request_body && '<ID>' && outboundID && '</ID>' && cl_abap_char_utilities=>cr_lf.
+                request_body = request_body && '<ID>' && attachmentID && '</ID>' && cl_abap_char_utilities=>cr_lf.
                 request_body = request_body && '<FileName>' && fileName && '</FileName>' && cl_abap_char_utilities=>cr_lf.
                 request_body = request_body && '<MimeType>' && mimeType && '</MimeType>' && cl_abap_char_utilities=>cr_lf.
                 request_body = request_body && '<Content>' && cl_abap_char_utilities=>cr_lf.
@@ -307,9 +466,9 @@ CLASS lhc_shipment IMPLEMENTATION.
 *                out->write( cl_abap_char_utilities=>cr_lf && status-code && cl_abap_char_utilities=>cr_lf ).
 *                out->write( cl_abap_char_utilities=>cr_lf && response_body && cl_abap_char_utilities=>cr_lf ).
 
-                IF ( status-code = 200 ).
+               IF ( status-code = 200 ).
                     APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-success text = 'Successfully Sent.'  ) ) TO reported-shipment.
-                ELSE.
+               ELSE.
                     DATA(code) = CONV string( status-code ).
                     CONCATENATE 'Error Status Code =' code '.' INTO DATA(text) SEPARATED BY space.
                     APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = text  ) ) TO reported-shipment.
@@ -350,12 +509,15 @@ CLASS lhc_shipment IMPLEMENTATION.
 
 *           SELECT OutboundDelivery FROM I_OutboundDeliveryTP WHERE ( SoldToParty = @sold_to_party ) INTO TABLE @DATA(lt_outbound_delivery).
 
+            <entity>-ReleaseDate = cl_abap_context_info=>get_system_date( ).
             MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
                 ENTITY Shipment
-                UPDATE FIELDS ( Released )
+                UPDATE FIELDS ( Released ReleaseDate )
                 WITH VALUE #( (
                     %tky        = <entity>-%tky
                     Released    = abap_true
+                    ReleaseDate = <entity>-ReleaseDate
+
                 ) )
                 FAILED DATA(failed3)
                 MAPPED DATA(mapped3)
@@ -390,6 +552,122 @@ CLASS lhc_shipment IMPLEMENTATION.
     ENDLOOP.
 
   ENDMETHOD. " release
+
+  METHOD retrieve. " on Pressing Retrieve button
+
+*   Available
+    DATA it_available_delete TYPE TABLE FOR DELETE zi_shipment_003\\Available.
+    DATA it_available_create TYPE TABLE FOR CREATE zi_shipment_003\_Available.
+
+    " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Shipment
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-Released = abap_true ).
+*           Short format message
+            APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'Shipment Binding is already released.' ) ) TO reported-shipment.
+            RETURN.
+        ENDIF.
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+        ENDIF.
+
+        IF ( <entity>-%is_draft = '01' ). " Draft
+        ENDIF.
+
+*       Read Available
+        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment BY \_Available
+            ALL FIELDS WITH VALUE #( (
+                %tky = <entity>-%tky
+            ) )
+            RESULT DATA(availables)
+            FAILED DATA(failed1)
+            REPORTED DATA(reported1).
+
+        DATA available LIKE LINE OF availables.
+        LOOP AT availables INTO available.
+            APPEND VALUE #( %tky = available-%tky ) TO it_available_delete.
+        ENDLOOP.
+
+*       Delete Available
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Available
+            DELETE FROM it_available_delete
+            FAILED DATA(failed2)
+            MAPPED DATA(mapped2)
+            REPORTED DATA(reported2).
+
+*       Read all relevant Outbound Deliveries
+        SELECT
+                I_OutboundDeliveryTP~OutboundDelivery
+             FROM
+                I_OutboundDeliveryTP JOIN I_OutboundDeliveryPartnerTP ON ( I_OutboundDeliveryTP~OutboundDelivery = I_OutboundDeliveryPartnerTP~OutboundDelivery )
+             WHERE
+                ( I_OutboundDeliveryPartnerTP~Customer          = @<entity>-PartyID ) AND     " Shipment Group
+                ( I_OutboundDeliveryPartnerTP~PartnerFunction   = 'ZS'              )" AND    " 'Shipment Group'
+                "( OverallGoodsMovementStatus                    = 'C'               )        " 'Completely Processed (C)'
+            ORDER BY
+                I_OutboundDeliveryTP~OutboundDelivery
+            INTO TABLE
+                @DATA(lt_outbounddelivery).
+
+*       Read Outbiund (for filtering)
+        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment BY \_Outbound
+            ALL FIELDS WITH VALUE #( (
+                %tky = <entity>-%tky
+            ) )
+            RESULT DATA(outbounds)
+            FAILED DATA(failed3)
+            REPORTED DATA(reported3).
+
+        DATA tabix TYPE sy-tabix.
+        LOOP AT lt_outbounddelivery INTO DATA(outbounddelivery).
+            tabix = sy-tabix.
+            DATA(ok) = abap_true.
+*           Check if has already been used in other shipments
+            SELECT SINGLE * FROM zi_outbound_003 WHERE ( OutboundDelivery = @outbounddelivery-OutboundDelivery ) INTO @DATA(zi_outbound_003).
+            IF ( sy-subrc = 0 ).
+                ok = abap_false.
+            ENDIF.
+*           Check if has already been used in  (added to) this shipment
+            READ TABLE outbounds  WITH KEY OutboundDelivery = outbounddelivery-OutboundDelivery TRANSPORTING NO FIELDS.
+            IF ( sy-subrc = 0 ).
+                ok = abap_false.
+            ENDIF.
+            IF ( ok = abap_true ).
+*               Add a New Available
+                APPEND VALUE #(
+                    %tky = <entity>-%tky
+                    %target = VALUE #( (
+                        %cid                = tabix
+                        %is_draft           = <entity>-%is_draft
+                        ShipmentUUID        = <entity>-ShipmentUUID
+                        OutboundDelivery    = outbounddelivery-OutboundDelivery
+                    ) )
+                ) TO it_available_create.
+            ENDIF.
+        ENDLOOP.
+
+*       Create New Available
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment
+            CREATE BY \_Available
+            FIELDS ( ShipmentUUID OutboundDelivery )
+            WITH it_available_create
+            FAILED DATA(failed4)
+            MAPPED DATA(mapped4)
+            REPORTED DATA(reported4).
+
+    ENDLOOP.
+
+  ENDMETHOD. " retrieve
 
   METHOD create_invoice. " on Create Invoice
 
@@ -439,8 +717,8 @@ CLASS lhc_shipment IMPLEMENTATION.
     DATA END OF item.
     DATA it_item LIKE TABLE OF item.
 
-*   Outbound (PDF)
-    DATA it_outbound_create TYPE TABLE FOR CREATE zi_shipment_003\_Outbound.
+*   Attachment (PDF)
+    DATA it_attachment_create TYPE TABLE FOR CREATE zi_shipment_003\_Attachment.
 
     DATA pricingElement TYPE I_BillingDocumentItemPrcgElmnt.
 
@@ -518,15 +796,15 @@ CLASS lhc_shipment IMPLEMENTATION.
 
 *               Item sections:
                 READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
-                    ENTITY Shipment BY \_Available
+                    ENTITY Shipment BY \_Outbound
                     ALL FIELDS WITH VALUE #( (
                         %tky = <entity>-%tky
                     ) )
-                    RESULT DATA(it_available)
+                    RESULT DATA(it_outbound)
                     FAILED DATA(failed1)
                     REPORTED DATA(reported1).
 
-                SORT it_available STABLE BY AvailableID.
+                SORT it_outbound STABLE BY OutboundID.
 
                 DATA quantity   TYPE I_BillingDocumentItem-BillingQuantity.
                 DATA listPrice  TYPE I_BillingDocumentItem-NetAmount.
@@ -538,23 +816,17 @@ CLASS lhc_shipment IMPLEMENTATION.
                 DATA totalDiscount  TYPE I_BillingDocumentItem-NetAmount        VALUE 0.
                 DATA totalMainPrice TYPE I_BillingDocumentItem-NetAmount        VALUE 0.
 
-                LOOP AT it_available INTO DATA(available).
+                LOOP AT it_outbound INTO DATA(outbound).
 
-                    available-OutboundDelivery = |{ available-OutboundDelivery ALPHA = IN }|.
+                    outbound-OutboundDelivery = |{ outbound-OutboundDelivery ALPHA = IN }|.
 
-                    SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @available-OutboundDelivery ) INTO        @DATA(outbounddelivery).
-                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @available-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
+                    SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO        @DATA(outbounddelivery).
+                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
 
                     LOOP AT it_outbounddeliveryitem INTO DATA(outbounddeliveryitem).
 
                         SELECT SINGLE * FROM I_BillingDocumentItem  WHERE ( ReferenceSDDocument  = @outbounddeliveryitem-OutboundDelivery ) AND ( ReferenceSDDocumentItem = @outbounddeliveryitem-OutboundDeliveryItem ) INTO @DATA(billingdocumentitem).
-                        SELECT SINGLE * FROM I_BillingDocument      WHERE ( BillingDocument      = @billingdocumentitem-BillingDocument ) INTO @DATA(billingdocument).
-
-                        IF ( billingdocumentitem IS INITIAL ).
-*                           Short format message
-*                           CONCATENATE 'Missing Invoice for Outbound Delivery' outbounddeliveryitem-OutboundDelivery '/' outbounddeliveryitem-OutboundDeliveryItem INTO DATA(text) SEPARATED BY space.
-*                           APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = text ) ) TO reported-shipment.
-*                           Long format message
+                        IF ( sy-subrc <> 0 ).
                             DATA(severity)  = if_abap_behv_message=>severity-error.
                             DATA msgno TYPE sy-msgno VALUE '001'.
                             DATA msgid TYPE sy-msgid VALUE 'Z_SHIPMENT_003'.
@@ -566,6 +838,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                             APPEND VALUE #( %key = <entity>-%key %msg = new_message( severity = severity id = msgid number = msgno v1 = msgv1 v2 = msgv2 v3 = msgv3 v4 = msgv4 ) ) TO reported-shipment.
                             RETURN.
                         ENDIF.
+                        SELECT SINGLE * FROM I_BillingDocument      WHERE ( BillingDocument      = @billingdocumentitem-BillingDocument ) INTO @DATA(billingdocument).
 
 *                       Product
                         "SELECT SINGLE * FROM I_Product WHERE ( Product = @billingdocumentitem-Product ) INTO @DATA(product).
@@ -781,7 +1054,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                     DATA(filename) = repository-RepositoryID && '_' && <entity>-ShipmentID && '.PDF'.
                     DATA(mimetype) = 'application/pdf'.
 
-*                   Add a New Outbound
+*                   Add a New Attachment
                     APPEND VALUE #(
                         %is_draft   = <entity>-%is_draft
                         ShipmentUUID = <entity>-ShipmentUUID
@@ -793,14 +1066,14 @@ CLASS lhc_shipment IMPLEMENTATION.
                             FileName        = filename
                             MimeType        = mimetype
                         ) )
-                    ) TO it_outbound_create.
+                    ) TO it_attachment_create.
 
                     " Create New Items
                     MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
                         ENTITY Shipment
-                        CREATE BY \_Outbound
+                        CREATE BY \_Attachment
                         FIELDS ( ShipmentUUID Attachment FileName MimeType )
-                        WITH it_outbound_create
+                        WITH it_attachment_create
                         FAILED DATA(failed2)
                         MAPPED DATA(mapped2)
                         REPORTED DATA(reported2).
@@ -858,8 +1131,8 @@ CLASS lhc_shipment IMPLEMENTATION.
     DATA END OF invoice.
     DATA it_invoice LIKE TABLE OF invoice.
 
-*   Outbound (PDF)
-    DATA it_outbound_create TYPE TABLE FOR CREATE zi_shipment_003\_Outbound.
+*   Attachment (PDF)
+    DATA it_attachment_create TYPE TABLE FOR CREATE zi_shipment_003\_Attachment.
 
     " Read transfered instances
     READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
@@ -909,33 +1182,27 @@ CLASS lhc_shipment IMPLEMENTATION.
 
 *               Item and Invoice sections:
                 READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
-                    ENTITY Shipment BY \_Available
+                    ENTITY Shipment BY \_Outbound
                     ALL FIELDS WITH VALUE #( (
                         %tky = <entity>-%tky
                     ) )
-                    RESULT DATA(it_available)
+                    RESULT DATA(it_outbound)
                     FAILED DATA(failed1)
                     REPORTED DATA(reported1).
 
                 DATA(count) = 0.
 
-                LOOP AT it_available INTO DATA(available).
+                LOOP AT it_outbound INTO DATA(outbound).
 
-                    available-OutboundDelivery = |{ available-OutboundDelivery ALPHA = IN }|.
+                    outbound-OutboundDelivery = |{ outbound-OutboundDelivery ALPHA = IN }|.
 
-                    SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @available-OutboundDelivery ) INTO        @DATA(outbounddelivery).
-                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @available-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
+                    SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO        @DATA(outbounddelivery).
+                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
 
                     LOOP AT it_outbounddeliveryitem INTO DATA(outbounddeliveryitem).
 
                         SELECT SINGLE * FROM I_BillingDocumentItem  WHERE ( ReferenceSDDocument  = @outbounddeliveryitem-OutboundDelivery ) AND ( ReferenceSDDocumentItem = @outbounddeliveryitem-OutboundDeliveryItem ) INTO @DATA(billingdocumentitem).
-                        SELECT SINGLE * FROM I_BillingDocument      WHERE ( BillingDocument      = @billingdocumentitem-BillingDocument ) INTO @DATA(billingdocument).
-
-                        IF ( billingdocumentitem IS INITIAL ).
-*                           Short format message
-*                           CONCATENATE 'Missing Invoice for Outbound Delivery' outbounddeliveryitem-OutboundDelivery '/' outbounddeliveryitem-OutboundDeliveryItem INTO DATA(text) SEPARATED BY space.
-*                           APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = text ) ) TO reported-shipment.
-*                           Long format message
+                        IF ( sy-subrc <> 0 ).
                             DATA(severity)  = if_abap_behv_message=>severity-error.
                             DATA msgno TYPE sy-msgno VALUE '001'.
                             DATA msgid TYPE sy-msgid VALUE 'Z_SHIPMENT_003'.
@@ -947,6 +1214,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                             APPEND VALUE #( %key = <entity>-%key %msg = new_message( severity = severity id = msgid number = msgno v1 = msgv1 v2 = msgv2 v3 = msgv3 v4 = msgv4 ) ) TO reported-shipment.
                             RETURN.
                         ENDIF.
+                        SELECT SINGLE * FROM I_BillingDocument      WHERE ( BillingDocument      = @billingdocumentitem-BillingDocument ) INTO @DATA(billingdocument).
 
 *                       Product
                         SELECT SINGLE * FROM I_Product  WHERE ( Product = @billingdocumentitem-Product ) INTO @DATA(product).
@@ -1127,14 +1395,14 @@ CLASS lhc_shipment IMPLEMENTATION.
                             FileName        = filename
                             MimeType        = mimetype
                         ) )
-                    ) TO it_outbound_create.
+                    ) TO it_attachment_create.
 
                     " Create New Items
                     MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
                         ENTITY Shipment
-                        CREATE BY \_Outbound
+                        CREATE BY \_Attachment
                         FIELDS ( ShipmentUUID Attachment FileName MimeType )
-                        WITH it_outbound_create
+                        WITH it_attachment_create
                         FAILED DATA(failed2)
                         MAPPED DATA(mapped2)
                         REPORTED DATA(reported2).
@@ -1153,7 +1421,7 @@ CLASS lhc_shipment IMPLEMENTATION.
 
   ENDMETHOD. " create_tkz_list
 
-  METHOD create_tariff_document. " on Create Tariff Document
+  METHOD create_tariff_document. " on pressing Create Tariff Document button
 
 *   Header
     DATA BEGIN OF header.
@@ -1194,8 +1462,8 @@ CLASS lhc_shipment IMPLEMENTATION.
     DATA END OF invoice.
     DATA it_invoice LIKE TABLE OF invoice.
 
-*   Outbound (PDF)
-    DATA it_outbound_create TYPE TABLE FOR CREATE zi_shipment_003\_Outbound.
+*   Attachment (PDF)
+    DATA it_attachment_create TYPE TABLE FOR CREATE zi_shipment_003\_Attachment.
 
     " Read transfered instances
     READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
@@ -1254,31 +1522,25 @@ CLASS lhc_shipment IMPLEMENTATION.
 
 *               Item and Invoice sections:
                 READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
-                    ENTITY Shipment BY \_Available
+                    ENTITY Shipment BY \_Outbound
                     ALL FIELDS WITH VALUE #( (
                         %tky = <entity>-%tky
                     ) )
-                    RESULT DATA(it_available)
+                    RESULT DATA(it_outbound)
                     FAILED DATA(failed1)
                     REPORTED DATA(reported1).
 
-                LOOP AT it_available INTO DATA(available).
+                LOOP AT it_outbound INTO DATA(outbound).
 
-                    available-OutboundDelivery = |{ available-OutboundDelivery ALPHA = IN }|.
+                    outbound-OutboundDelivery = |{ outbound-OutboundDelivery ALPHA = IN }|.
 
-                    SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @available-OutboundDelivery ) INTO        @DATA(outbounddelivery).
-                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @available-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
+                    SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO        @DATA(outbounddelivery).
+                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
 
                     LOOP AT it_outbounddeliveryitem INTO DATA(outbounddeliveryitem).
 
                         SELECT SINGLE * FROM I_BillingDocumentItem  WHERE ( ReferenceSDDocument  = @outbounddeliveryitem-OutboundDelivery ) AND ( ReferenceSDDocumentItem = @outbounddeliveryitem-OutboundDeliveryItem ) INTO @DATA(billingdocumentitem).
-                        SELECT SINGLE * FROM I_BillingDocument      WHERE ( BillingDocument      = @billingdocumentitem-BillingDocument ) INTO @DATA(billingdocument).
-
-                        IF ( billingdocumentitem IS INITIAL ).
-*                           Short format message
-*                           CONCATENATE 'Missing Invoice for Outbound Delivery' outbounddeliveryitem-OutboundDelivery '/' outbounddeliveryitem-OutboundDeliveryItem INTO DATA(text) SEPARATED BY space.
-*                           APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = text ) ) TO reported-shipment.
-*                           Long format message
+                        IF ( sy-subrc <> 0 ).
                             DATA(severity)  = if_abap_behv_message=>severity-error.
                             DATA msgno TYPE sy-msgno VALUE '001'.
                             DATA msgid TYPE sy-msgid VALUE 'Z_SHIPMENT_003'.
@@ -1290,6 +1552,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                             APPEND VALUE #( %key = <entity>-%key %msg = new_message( severity = severity id = msgid number = msgno v1 = msgv1 v2 = msgv2 v3 = msgv3 v4 = msgv4 ) ) TO reported-shipment.
                             RETURN.
                         ENDIF.
+                        SELECT SINGLE * FROM I_BillingDocument      WHERE ( BillingDocument      = @billingdocumentitem-BillingDocument ) INTO @DATA(billingdocument).
 
 *                       Commodity Code
                         SELECT SINGLE
@@ -1302,21 +1565,6 @@ CLASS lhc_shipment IMPLEMENTATION.
                             INTO
                                 @DATA(prodcommoditycodeforkeydate).
 
-*                       Commodity Code Text
-*                        DATA commodityCodeText TYPE string.
-*                        SELECT SINGLE
-*                                \_CommodityCodeText-TrdClassfctnNmbrText AS TrdClassfctnNmbrText
-*                             FROM
-*                                C_ProdCommodityCodeForKeyDate( p_keydate = @billingdocument-billingdocumentdate )
-*                             WHERE
-*                                ( C_ProdCommodityCodeForKeyDate~Product                     = @billingdocumentitem-Product                   ) AND
-*                                ( C_ProdCommodityCodeForKeyDate~Country                     = @billingdocumentitem-DepartureCountry          ) AND
-*                                ( C_ProdCommodityCodeForKeyDate~ValidityStartDate           = @prodcommoditycodeforkeydate-ValidityStartDate ) AND
-*                                ( C_ProdCommodityCodeForKeyDate~TrdClassfctnNmbrSchm        = 'EU01'                                         ) AND
-*                                ( C_ProdCommodityCodeForKeyDate~TrdClassfctnNmbrSchmCntnt   = 'EU01'                                         ) AND
-*                                ( \_CommodityCodeText-TrdClassfctnNmbrSchmCntnt IS NOT NULL )
-*                             INTO
-*                                @DATA(commodityCodeText).
                         get_commodity_code_internal(
                             EXPORTING
                                 i_code        = CONV string( prodcommoditycodeforkeydate-CommodityCode )
@@ -1346,17 +1594,6 @@ CLASS lhc_shipment IMPLEMENTATION.
                                 @DATA(product).
 
 *                       Country Of Origin
-*                        DATA countryOfOrigin TYPE string.
-*                        SELECT SINGLE
-*                                \_ESHProductPlant-CountryOfOrigin
-*                            FROM
-*                                I_Product
-*                            WHERE
-*                                ( I_Product~Product         = @billingdocumentitem-Product  ) AND
-*                                ( \_ESHProductPlant-Plant   = '1000'                        ) AND " Fiege DE
-*                                ( \_ESHProductPlant-Product IS NOT NULL )
-*                            INTO
-*                                @DATA(countryOfOrigin).
                         SELECT SINGLE
                                 ProdPlantInternationalTrade~CountryOfOrigin
                             FROM
@@ -1547,7 +1784,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                     DATA(filename) = repository-RepositoryID && '_' && <entity>-ShipmentID && '.PDF'.
                     DATA(mimetype) = 'application/pdf'.
 
-*                   Add a New Outbound
+*                   Add a New Attachment
                     APPEND VALUE #(
                         %is_draft   = <entity>-%is_draft
                         ShipmentUUID = <entity>-ShipmentUUID
@@ -1559,20 +1796,19 @@ CLASS lhc_shipment IMPLEMENTATION.
                             FileName        = filename
                             MimeType        = mimetype
                         ) )
-                    ) TO it_outbound_create.
+                    ) TO it_attachment_create.
 
                     " Create New Items
                     MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
                         ENTITY Shipment
-                        CREATE BY \_Outbound
+                        CREATE BY \_Attachment
                         FIELDS ( ShipmentUUID Attachment FileName MimeType )
-                        WITH it_outbound_create
+                        WITH it_attachment_create
                         FAILED DATA(failed2)
                         MAPPED DATA(mapped2)
                         REPORTED DATA(reported2).
 
                 ENDIF.
-
 
             ENDIF.
 
@@ -1586,10 +1822,10 @@ CLASS lhc_shipment IMPLEMENTATION.
 
   ENDMETHOD. " create_tariff_document
 
-  METHOD create_eci. " on Create ECI
+  METHOD create_eci. " on pressing Create ECI button
 
 *   Outbound (CSV)
-    DATA it_outbound_create TYPE TABLE FOR CREATE zi_shipment_003\_Outbound.
+    DATA it_attachment_create TYPE TABLE FOR CREATE zi_shipment_003\_Attachment.
 
     " Read transfered instances
     READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
@@ -1607,11 +1843,11 @@ CLASS lhc_shipment IMPLEMENTATION.
 
 *       Item and Invoice sections:
         READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
-            ENTITY Shipment BY \_Available
+            ENTITY Shipment BY \_Outbound
             ALL FIELDS WITH VALUE #( (
                 %tky = <entity>-%tky
             ) )
-            RESULT DATA(it_available)
+            RESULT DATA(it_outbound)
             FAILED DATA(failed1)
             REPORTED DATA(reported1).
 
@@ -1619,13 +1855,13 @@ CLASS lhc_shipment IMPLEMENTATION.
 
         body = body && 'Proveedor;Empresa Recepción;Lugar Recepción;Empresa Destino;Lugar destino;Uneco;Pedido;Albarán;Bultos;Embalaje;Transportista;Expedición' && cl_abap_char_utilities=>cr_lf.
 
-        LOOP AT it_available INTO DATA(available).
+        LOOP AT it_outbound INTO DATA(outbound).
 
 *           Outbound Delivery
-            SELECT SINGLE * FROM I_OutboundDelivery WHERE ( OutboundDelivery = @available-OutboundDelivery ) INTO @DATA(outboundDelivery).
+            SELECT SINGLE * FROM I_OutboundDelivery WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO @DATA(outboundDelivery).
 
 *           Outbound Delivery Item
-            SELECT SINGLE * FROM I_OutboundDeliveryItem WHERE ( OutboundDelivery = @available-OutboundDelivery ) INTO @DATA(outboundDeliveryItem).
+            SELECT SINGLE * FROM I_OutboundDeliveryItem WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO @DATA(outboundDeliveryItem).
 
 *           Sales Order
             SELECT SINGLE * FROM I_SalesOrder WHERE ( SalesOrder = @outboundDeliveryItem-ReferenceSDDocument ) INTO @DATA(salesOrder).
@@ -1636,73 +1872,14 @@ CLASS lhc_shipment IMPLEMENTATION.
 *           Proveedor
             body = body && '1125518' && ';'.
 
-*           Empresa RecepciÃ³n
+*           Empresa Recepción
             body = body && '1' && ';'.
 
-*            Lugar RecepciÃ³n
-*            "Shipment Group Madrid = 50, Shipment Group Barcelona = 62, Shipment Group Portugal = 53" (hard code)
-*            CASE <entity>-PartyID.  " Shipment Group (Sendungsgruppe)
-*                WHEN 'ECI VALDEMORO MADRID'.
-*                    body = body && '50;'.
-*                WHEN 'ECI MONTORNES BARCELONA'.
-*                    body = body && '62;'.
-*                WHEN OTHERS.
-*                    body = body && ';'.
-*            ENDCASE.
-*           Benedikt Pecuch: "zoberte to z Customer master data zo shipment group Name 3"
+*           Lugar Recepción (Benedikt Pecuch: "zoberte to z Customer master data zo shipment group Name 3")
             body = body && <entity>-OrganisationFormattedName3 && ';'. " 50
 
 *           Empresa Destino
             body = body && '1' && ';'.
-
-*            TODO - Taken from ByDesign:
-*            IF ( <entity>-Response IS NOT INITIAL ).
-*            {
-*                var query = SalesOrder.QueryByElements;
-*                var selectionParams = query.CreateSelectionParams();
-*                selectionParams.Add(query.BuyerID.content, "I", "EQ", addedShipmentResponse.Response.ExternalReference);
-*                var resultData = query.Execute(selectionParams);
-*                var shopNumber : ID;
-*                foreach(var salesOrder in resultData)
-*                {
-*                    if(salesOrder.BuyerParty.IsSet())
-*                    {
-*                        if(salesOrder.BuyerParty.PartyKey.PartyID.content.Substring(0,5) == "ES101")
-*                        {
-*                            var addressInfo;
-*                            foreach(var i in salesOrder.BuyerParty.Party.Customer.AddressInformation)
-*                            {
-*                                if(i.AddressCurrentAddressDeterminationProcesses.IsSet())
-*                                {
-*                                    if(i.AddressCurrentAddressDeterminationProcesses.DefaultAddressDeterminationProcessRelevanceIndicator == true)
-*                                    {
-*                                        addressInfo = i;
-*                                    }
-*                                }
-*                            }
-*                            if(addressInfo.Address.IsSet())
-*                            {
-*                                if(addressInfo.Address.DefaultPostalAddressRepresentation.IsSet())
-*                                {
-*                                    shopNumber = addressInfo.Address.DefaultPostalAddressRepresentation.StreetPrefixName.Substring(0,3);
-*                                    shopNumber = shopNumber.RemoveLeadingZeros();
-*                                }
-*                            }
-*                            break;
-*                        }
-*                    }
-*
-*                }
-*                body = body + shopNumber + ";";
-*
-*                body = body + "110;";
-*                body = body + addedShipmentResponse.Response.ExternalReference + ";";
-*                body = body + addedShipmentResponse.Response.ODRequestID.RemoveLeadingZeros() + ";";
-*                body = body + addedShipmentResponse.Response.NumberOfPackages.RoundToString(0) + ";";
-*            }
-*            ELSE.
-*                body = body && ';100;'.
-*            ENDIF.
 
 *           Lugar destino ("customer master data -> Main Adress -> Adress Line 1 -> first 3 digits")
             body = body && businessPartnerAddress-StreetPrefixName(3) && ';'. " 994
@@ -1710,12 +1887,11 @@ CLASS lhc_shipment IMPLEMENTATION.
 *           Uneco (always 110)
             body = body && '110' && ';'. " 110
 
-* New Change
 *           Pedido (External Reference (from SO))
             body = body && |{ salesOrder-PurchaseOrderByCustomer ALPHA = OUT }| && ';'. " Fiege 16.5
 
-*           AlbarÃ¡n (delivery note)
-            body = body && |{ available-OutboundDelivery ALPHA = OUT }| && ';'. " 80000120
+*           Albarán (delivery note)
+            body = body && |{ outbound-OutboundDelivery ALPHA = OUT }| && ';'. " 80000120
 
 *           Bultos (number of packages)
             body = body && |{ outboundDelivery-UnloadingPointName ALPHA = OUT }| && ';'. " 1
@@ -1726,7 +1902,7 @@ CLASS lhc_shipment IMPLEMENTATION.
 *           Transportista
             body = body && 'Senator;'.
 
-*           ExpediciĂłn
+*           Expedición
             body = body && '0'.
 
             body = body && cl_abap_char_utilities=>cr_lf.
@@ -1739,7 +1915,7 @@ CLASS lhc_shipment IMPLEMENTATION.
         DATA(filename) = 'ECI' && '_' && <entity>-ShipmentID && '.CSV'.
         DATA(mimetype) = 'text/csv'.
 
-*       Add a New Outbound
+*       Add a New Attachment
         APPEND VALUE #(
             %is_draft   = <entity>-%is_draft
             ShipmentUUID = <entity>-ShipmentUUID
@@ -1751,14 +1927,14 @@ CLASS lhc_shipment IMPLEMENTATION.
                 FileName        = filename
                 MimeType        = mimetype
             ) )
-        ) TO it_outbound_create.
+        ) TO it_attachment_create.
 
         " Create New Items
         MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
             ENTITY Shipment
-            CREATE BY \_Outbound
+            CREATE BY \_Attachment
             FIELDS ( ShipmentUUID Attachment FileName MimeType )
-            WITH it_outbound_create
+            WITH it_attachment_create
             FAILED DATA(failed2)
             MAPPED DATA(mapped2)
             REPORTED DATA(reported2).
@@ -1785,9 +1961,6 @@ CLASS lhc_shipment IMPLEMENTATION.
 *    ENDLOOP.
 
   ENDMETHOD. " on_create
-
-*  METHOD on_save_customer.
-*  ENDMETHOD. " on_save_customer
 
   METHOD on_modify_customer.
 
@@ -1874,10 +2047,14 @@ CLASS lhc_shipment IMPLEMENTATION.
 
             get_address_internal(
               EXPORTING
-                i_customer     = CONV string( ls_customer-Customer )
+                i_customer      = CONV string( ls_customer-Customer )
               IMPORTING
-                o_street_name  = DATA(streetName)
-                o_house_number = DATA(houseNumber)
+                o_street_name   = DATA(streetName)
+                o_house_number  = DATA(houseNumber)
+                o_address_line1 = DATA(address_line1)
+                o_address_line2 = DATA(address_line2)
+                o_address_line3 = DATA(address_line3)
+                o_address_line4 = DATA(address_line4)
             ).
 
         ENDIF.
@@ -1911,9 +2088,9 @@ CLASS lhc_shipment IMPLEMENTATION.
                 CountryCode                 = ls_customer-Country
                 HouseID                     = houseNumber
                 OrganisationFormattedName1  = ls_customer-BusinessPartnerName1
-                OrganisationFormattedName2  = ls_customer-BusinessPartnerName2
-                OrganisationFormattedName3  = ls_customer-BusinessPartnerName3
-                OrganisationFormattedName4  = ls_customer-BusinessPartnerName4
+                OrganisationFormattedName2  = address_line1 " ls_customer-BusinessPartnerName2
+                OrganisationFormattedName3  = address_line2 " ls_customer-BusinessPartnerName3
+                OrganisationFormattedName4  = address_line3 " ls_customer-BusinessPartnerName4
                 StreetName                  = streetName
                 StreetPostalCode            = ls_customer-PostalCode
                 TaxJurisdictionCode         = ls_customer-TaxJurisdiction
@@ -2122,14 +2299,59 @@ CLASS lhc_shipment IMPLEMENTATION.
 
         DATA(status) = lo_http_response->get_status( ).
 
-        REPLACE '<d:StreetName>'        IN text WITH '******'.
-        REPLACE '</d:StreetName>'       IN text WITH '******'.
-        REPLACE '<d:HouseNumber>'       IN text WITH '******'.
-        REPLACE '</d:HouseNumber>'      IN text WITH '******'.
-        SPLIT text AT '******' INTO DATA(s1) DATA(s2) DATA(s3) DATA(s4) DATA(s5).
+*       Parse Text
+        DATA buff   TYPE string.
+        DATA s1     TYPE string.
+        DATA s2     TYPE string.
+        DATA s3     TYPE string.
 
+*       Street Name
+        buff = text.
+        REPLACE '<d:StreetName>'        IN buff WITH '******'.
+        REPLACE '</d:StreetName>'       IN buff WITH '******'.
+        CLEAR: s1, s2, s3.
+        SPLIT buff AT '******' INTO s1 s2 s3.
+        o_street_name   = s2.
+
+*       House Number
+        buff = text.
+        REPLACE '<d:HouseNumber>'       IN buff WITH '******'.
+        REPLACE '</d:HouseNumber>'      IN buff WITH '******'.
+        CLEAR: s1, s2, s3.
+        SPLIT buff AT '******' INTO s1 s2 s3.
         o_house_number  = s2.
-        o_street_name   = s4.
+
+*       Address Line 1
+        buff = text.
+        REPLACE '<d:StreetPrefixName>'  IN buff WITH '******'.
+        REPLACE '</d:StreetPrefixName>' IN buff WITH '******'.
+        CLEAR: s1, s2, s3.
+        SPLIT buff AT '******' INTO s1 s2 s3.
+        o_address_line1 = s2.
+
+*       Address Line 2
+        buff = text.
+        REPLACE '<d:AdditionalStreetPrefixName>'  IN buff WITH '******'.
+        REPLACE '</d:AdditionalStreetPrefixName>' IN buff WITH '******'.
+        CLEAR: s1, s2, s3.
+        SPLIT buff AT '******' INTO s1 s2 s3.
+        o_address_line2 = s2.
+
+*       Address Line 3
+        buff = text.
+        REPLACE '<d:StreetSuffixName>'  IN buff WITH '******'.
+        REPLACE '</d:StreetSuffixName>' IN buff WITH '******'.
+        CLEAR: s1, s2, s3.
+        SPLIT buff AT '******' INTO s1 s2 s3.
+        o_address_line3 = s2.
+
+*       Address Line 4
+        buff = text.
+        REPLACE '<d:AdditionalStreetSuffixName>'  IN buff WITH '******'.
+        REPLACE '</d:AdditionalStreetSuffixName>' IN buff WITH '******'.
+        CLEAR: s1, s2, s3.
+        SPLIT buff AT '******' INTO s1 s2 s3.
+        o_address_line4 = s2.
 
     CATCH cx_abap_context_info_error INTO DATA(lx_abap_context_info_error).
       " Handle remote Exception
@@ -2297,6 +2519,22 @@ CLASS lhc_shipment IMPLEMENTATION.
   ENDMETHOD. " split_string_internal
 
   METHOD get_commodity_code_internal. " Get Commodity Code/Description By Code (output Code is for checking)
+
+*   Commodity Code Text
+*    DATA commodityCodeText TYPE string.
+*    SELECT SINGLE
+*            \_CommodityCodeText-TrdClassfctnNmbrText AS TrdClassfctnNmbrText
+*         FROM
+*            C_ProdCommodityCodeForKeyDate( p_keydate = @billingdocument-billingdocumentdate )
+*         WHERE
+*            ( C_ProdCommodityCodeForKeyDate~Product                     = @billingdocumentitem-Product                   ) AND
+*            ( C_ProdCommodityCodeForKeyDate~Country                     = @billingdocumentitem-DepartureCountry          ) AND
+*            ( C_ProdCommodityCodeForKeyDate~ValidityStartDate           = @prodcommoditycodeforkeydate-ValidityStartDate ) AND
+*            ( C_ProdCommodityCodeForKeyDate~TrdClassfctnNmbrSchm        = 'EU01'                                         ) AND
+*            ( C_ProdCommodityCodeForKeyDate~TrdClassfctnNmbrSchmCntnt   = 'EU01'                                         ) AND
+*            ( \_CommodityCodeText-TrdClassfctnNmbrSchmCntnt IS NOT NULL )
+*         INTO
+*            @DATA(commodityCodeText).
 
 *   Hard Code:
     o_description   = ''.
@@ -2552,72 +2790,27 @@ CLASS lhc_available DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
   PRIVATE SECTION.
 
+*   METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION IMPORTING keys REQUEST requested_authorizations FOR Available RESULT result.
+
     METHODS on_available_create FOR DETERMINE ON MODIFY IMPORTING keys FOR Available~on_available_create.
+
     METHODS on_outbound_delivery_modify FOR DETERMINE ON MODIFY IMPORTING keys FOR Available~on_outbound_delivery_modify.
+
+*    METHODS add FOR MODIFY IMPORTING keys FOR ACTION Available~add.
 
 ENDCLASS. " lhc_available DEFINITION
 
 CLASS lhc_available IMPLEMENTATION.
 
+* METHOD get_instance_authorizations.
+* ENDMETHOD.
+
   METHOD on_available_create.
+  ENDMETHOD.
 
-     " Read transfered instances
-    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
-        ENTITY Available
-        ALL FIELDS
-        WITH CORRESPONDING #( keys )
-        RESULT DATA(entities).
+  METHOD on_outbound_delivery_modify. " on Outbound Delivery changed
 
-    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
-
-        IF ( <entity>-%is_draft = '00' ). " Saved
-        ENDIF.
-        IF ( <entity>-%is_draft = '01' ). " Draft
-        ENDIF.
-
-*       Read items
-        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
-            ENTITY Shipment BY \_Available
-            ALL FIELDS WITH VALUE #( (
-                %is_draft       = <entity>-%is_draft
-                ShipmentUUID    = <entity>-ShipmentUUID
-            ) )
-            RESULT DATA(lt_available)
-            FAILED DATA(failed1)
-            REPORTED DATA(reported1).
-
-        SORT lt_available STABLE BY AvailableID DESCENDING.
-
-        DATA newAvailableID TYPE zi_available_003-AvailableID.
-
-        IF ( lt_available[] IS INITIAL ).
-            newAvailableID = 10.
-        ELSE.
-            READ TABLE lt_available INDEX 1 INTO DATA(available).
-            newAvailableID = available-AvailableID + 10.
-        ENDIF.
-
-        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
-            ENTITY Available
-            UPDATE FIELDS (
-                AvailableID
-            )
-            WITH VALUE #( (
-                %is_draft       = <entity>-%is_draft
-                AvailableUUID   = <entity>-AvailableUUID
-                AvailableID     = newAvailableID
-            ) )
-            MAPPED DATA(mapped2)
-            FAILED DATA(failed2)
-            REPORTED DATA(reported2).
-
-    ENDLOOP.
-
-  ENDMETHOD. " on_available_create
-
-  METHOD on_outbound_delivery_modify.
-
-    DATA outboundDelivery TYPE zi_available_003-OutboundDelivery.
+    DATA outboundDelivery TYPE zi_outbound_003-OutboundDelivery.
 
      " Read transfered instances
     READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
@@ -2630,21 +2823,42 @@ CLASS lhc_available IMPLEMENTATION.
 
         outboundDelivery = |{ <entity>-OutboundDelivery ALPHA = IN }|. " Add leading zeros
 
-        IF ( outboundDelivery <> <entity>-OutboundDelivery ).
+        DATA referenceSDDocument        TYPE I_SalesOrder-SalesOrder.
+        DATA purchaseOrderByCustomer    TYPE I_SalesOrder-PurchaseOrderByCustomer.
+        SELECT SINGLE * FROM I_OutboundDeliveryItem WHERE ( OutboundDelivery = @outboundDelivery ) INTO @DATA(outboundDeliveryItem).
+        IF ( sy-subrc = 0 ).
+            referenceSDDocument = outboundDeliveryItem-ReferenceSDDocument.
+            SELECT SINGLE * FROM I_SalesOrder WHERE ( SalesOrder = @referenceSDDocument ) INTO @DATA(salesOrder).
+            IF ( sy-subrc = 0 ).
+                purchaseOrderByCustomer = salesOrder-PurchaseOrderByCustomer.
+            ENDIF.
+        ENDIF.
 
-*           Link to Outbound Delivery
-            DATA(outboundDeliveryURL) = |/ui#OutboundDelivery-displayFactSheet?sap-app-origin-hint=&/C_OutboundDeliveryFs('| && condense( val = |{ <entity>-OutboundDelivery ALPHA = OUT }| ) && |')|. " '80000000'
+*       Prevent endless cycling and to fill URL
+        IF ( ( outboundDelivery <> <entity>-OutboundDelivery ) OR ( <entity>-OutboundDeliveryURL IS INITIAL ) OR ( referenceSDDocument <> <entity>-SalesOrder ) OR ( <entity>-SalesOrderURL IS INITIAL ) ).
+
+*           Link to Outbound Delivery>: https://my404898.s4hana.cloud.sap/ui#OutboundDelivery-displayFactSheet?sap-app-origin-hint=&/C_OutboundDeliveryFs('80000012')
+            DATA(outboundDeliveryURL) = |/ui#OutboundDelivery-displayFactSheet?sap-app-origin-hint=&/C_OutboundDeliveryFs('| && condense( val = |{ outboundDelivery ALPHA = OUT }| ) && |')|. " '80000012'
+*           Link to Sales Order: https://my404898.s4hana.cloud.sap/ui#SalesOrder-manageV2&/SalesOrderManage('19')
+            DATA(salesOrderURL) = |/ui#SalesOrder-manageV2&/SalesOrderManage('| && condense( val = |{ referenceSDDocument ALPHA = OUT }| ) && |')|. " '19'
 
             MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
                 ENTITY Available
                 UPDATE FIELDS (
                     OutboundDelivery
+                    SalesOrder
+                    PurchaseOrderByCustomer
                     OutboundDeliveryURL
+                    SalesOrderURL
                 )
                 WITH VALUE #( (
-                    %tky                = <entity>-%tky
-                    OutboundDelivery    = outboundDelivery
-                    OutboundDeliveryURL = outboundDeliveryURL
+                    %tky                    = <entity>-%tky
+                    OutboundDelivery        = outboundDelivery
+                    SalesOrder              = referenceSDDocument
+                    PurchaseOrderByCustomer = purchaseOrderByCustomer
+                    OutboundDeliveryURL     = outboundDeliveryURL
+                    SalesOrderURL           = salesOrderURL
+
                 ) )
                 MAPPED DATA(mapped1)
                 FAILED DATA(failed1)
@@ -2663,6 +2877,10 @@ CLASS lhc_outbound DEFINITION INHERITING FROM cl_abap_behavior_handler.
   PRIVATE SECTION.
 
     METHODS on_outbound_create FOR DETERMINE ON MODIFY IMPORTING keys FOR Outbound~on_outbound_create.
+
+    METHODS on_outbound_delivery_modify FOR DETERMINE ON MODIFY IMPORTING keys FOR Outbound~on_outbound_delivery_modify.
+
+*    METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION IMPORTING keys REQUEST requested_authorizations FOR Outbound RESULT result.
 
 ENDCLASS. " lhc_outbound DEFINITION
 
@@ -2684,7 +2902,7 @@ CLASS lhc_outbound IMPLEMENTATION.
         IF ( <entity>-%is_draft = '01' ). " Draft
         ENDIF.
 
-*       Read items
+*       Read Outbound (Added)
         READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
             ENTITY Shipment BY \_Outbound
             ALL FIELDS WITH VALUE #( (
@@ -2703,7 +2921,7 @@ CLASS lhc_outbound IMPLEMENTATION.
             newOutboundID = 1.
         ELSE.
             READ TABLE lt_outbound INDEX 1 INTO DATA(outbound).
-            newOutboundID = outbound-OutboundID + 1.
+            newOutboundID = outbound-OutboundID + 10.
         ENDIF.
 
         MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
@@ -2724,4 +2942,136 @@ CLASS lhc_outbound IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD on_outbound_delivery_modify.
+
+    DATA outboundDelivery TYPE zi_outbound_003-OutboundDelivery.
+
+     " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Outbound
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        outboundDelivery = |{ <entity>-OutboundDelivery ALPHA = IN }|. " Add leading zeros
+
+        DATA referenceSDDocument        TYPE I_SalesOrder-SalesOrder.
+        DATA purchaseOrderByCustomer    TYPE I_SalesOrder-PurchaseOrderByCustomer.
+        SELECT SINGLE * FROM I_OutboundDeliveryItem WHERE ( OutboundDelivery = @outboundDelivery ) INTO @DATA(outboundDeliveryItem).
+        IF ( sy-subrc = 0 ).
+            referenceSDDocument = outboundDeliveryItem-ReferenceSDDocument.
+            SELECT SINGLE * FROM I_SalesOrder WHERE ( SalesOrder = @referenceSDDocument ) INTO @DATA(salesOrder).
+            IF ( sy-subrc = 0 ).
+                purchaseOrderByCustomer = salesOrder-PurchaseOrderByCustomer.
+            ENDIF.
+        ENDIF.
+
+*       Prevent endless cycling and to fill URL
+        IF ( ( outboundDelivery <> <entity>-OutboundDelivery ) OR ( <entity>-OutboundDeliveryURL IS INITIAL ) OR ( referenceSDDocument <> <entity>-SalesOrder ) OR ( <entity>-SalesOrderURL IS INITIAL ) ).
+
+*           Link to Outbound Delivery>: https://my404898.s4hana.cloud.sap/ui#OutboundDelivery-displayFactSheet?sap-app-origin-hint=&/C_OutboundDeliveryFs('80000012')
+            DATA(outboundDeliveryURL) = |/ui#OutboundDelivery-displayFactSheet?sap-app-origin-hint=&/C_OutboundDeliveryFs('| && condense( val = |{ outboundDelivery ALPHA = OUT }| ) && |')|. " '80000012'
+*           Link to Sales Order: https://my404898.s4hana.cloud.sap/ui#SalesOrder-manageV2&/SalesOrderManage('19')
+            DATA(salesOrderURL) = |/ui#SalesOrder-manageV2&/SalesOrderManage('| && condense( val = |{ referenceSDDocument ALPHA = OUT }| ) && |')|. " '19'
+
+            MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+                ENTITY Outbound
+                UPDATE FIELDS (
+                    OutboundDelivery
+                    SalesOrder
+                    PurchaseOrderByCustomer
+                    OutboundDeliveryURL
+                    SalesOrderURL
+                )
+                WITH VALUE #( (
+                    %tky                    = <entity>-%tky
+                    OutboundDelivery        = outboundDelivery
+                    SalesOrder              = referenceSDDocument
+                    PurchaseOrderByCustomer = purchaseOrderByCustomer
+                    OutboundDeliveryURL     = outboundDeliveryURL
+                    SalesOrderURL           = salesOrderURL
+                ) )
+                MAPPED DATA(mapped1)
+                FAILED DATA(failed1)
+                REPORTED DATA(reported1).
+
+        ENDIF.
+
+    ENDLOOP.
+
+  ENDMETHOD. " on_outbound_delivery_modify
+
+*  METHOD get_instance_authorizations.
+*  ENDMETHOD.
+
 ENDCLASS. " lhc_outbound IMPLEMENTATION
+
+
+CLASS lhc_attachment DEFINITION INHERITING FROM cl_abap_behavior_handler.
+
+  PRIVATE SECTION.
+    METHODS on_attachment_create FOR DETERMINE ON MODIFY IMPORTING keys FOR Attachment~on_attachment_create.
+
+ENDCLASS. " lhc_attachment DEFINITION
+
+CLASS lhc_attachment IMPLEMENTATION.
+
+  METHOD on_attachment_create.
+
+     " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Attachment
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+        ENDIF.
+        IF ( <entity>-%is_draft = '01' ). " Draft
+        ENDIF.
+
+*       Read items
+        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment BY \_Attachment
+            ALL FIELDS WITH VALUE #( (
+                %is_draft       = <entity>-%is_draft
+                ShipmentUUID    = <entity>-ShipmentUUID
+            ) )
+            RESULT DATA(lt_attachment)
+            FAILED DATA(failed1)
+            REPORTED DATA(reported1).
+
+        SORT lt_attachment STABLE BY AttachmentID DESCENDING.
+
+        DATA newAttachmentID TYPE zi_attachment_003-AttachmentID.
+
+        IF ( lt_attachment[] IS INITIAL ).
+            newAttachmentID = 1.
+        ELSE.
+            READ TABLE lt_attachment INDEX 1 INTO DATA(attachment).
+            newAttachmentID = attachment-AttachmentID + 1.
+        ENDIF.
+
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Attachment
+            UPDATE FIELDS (
+                AttachmentID
+            )
+            WITH VALUE #( (
+                %is_draft       = <entity>-%is_draft
+                AttachmentUUID    = <entity>-AttachmentUUID
+                AttachmentID      = newAttachmentID
+            ) )
+            MAPPED DATA(mapped2)
+            FAILED DATA(failed2)
+            REPORTED DATA(reported2).
+
+    ENDLOOP.
+
+  ENDMETHOD. " on_attachment_create
+
+ENDCLASS. " lhc_attachment IMPLEMENTATION
