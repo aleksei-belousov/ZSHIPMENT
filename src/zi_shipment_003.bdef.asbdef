@@ -29,6 +29,7 @@ etag master LocalLastChangedAt
   action create_tkz_list; // pdf
   action create_tariff_document; // pdf
   action create_eci; // csv
+  action create_exp_decl; // csv
 
   // Events:
   determination on_create on modify { field ShipmentUUID; }
@@ -56,6 +57,7 @@ etag master LocalLastChangedAt
     action create_eci affects entity _Attachment;
     action create_invoice affects entity _Attachment;
     action create_tkz_list affects entity _Attachment;
+    action create_exp_decl affects entity _Attachment;
   }
 
 }
@@ -114,7 +116,7 @@ etag master LocalLastChangedAt
   field ( readonly, numbering : managed ) OutboundUUID;
   field ( readonly ) ShipmentUUID;
   field ( readonly ) OutboundID;
-  //field ( readonly ) OutboundDelivery;
+  field ( readonly ) OutboundDelivery;
   field ( readonly ) SalesOrder;
   field ( readonly ) PurchaseOrderByCustomer;
 

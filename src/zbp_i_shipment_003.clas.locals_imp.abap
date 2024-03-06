@@ -23,17 +23,15 @@ CLASS lhc_shipment DEFINITION INHERITING FROM cl_abap_behavior_handler.
     METHODS on_modify_customer FOR DETERMINE ON MODIFY
       IMPORTING keys FOR Shipment~on_modify_customer.
 
-    METHODS create_invoice FOR MODIFY
-      IMPORTING keys FOR ACTION Shipment~create_invoice.
+    METHODS create_invoice FOR MODIFY IMPORTING keys FOR ACTION Shipment~create_invoice.
 
-    METHODS create_tkz_list FOR MODIFY
-      IMPORTING keys FOR ACTION Shipment~create_tkz_list.
+    METHODS create_tkz_list FOR MODIFY IMPORTING keys FOR ACTION Shipment~create_tkz_list.
 
-    METHODS create_tariff_document FOR MODIFY
-      IMPORTING keys FOR ACTION Shipment~create_tariff_document.
+    METHODS create_tariff_document FOR MODIFY IMPORTING keys FOR ACTION Shipment~create_tariff_document.
 
-    METHODS create_eci FOR MODIFY
-      IMPORTING keys FOR ACTION Shipment~create_eci.
+    METHODS create_eci FOR MODIFY IMPORTING keys FOR ACTION Shipment~create_eci.
+
+    METHODS create_exp_decl FOR MODIFY IMPORTING keys FOR ACTION Shipment~create_exp_decl.
 
     METHODS on_modify_recipient FOR DETERMINE ON MODIFY IMPORTING keys FOR Shipment~on_modify_recipient.
 
@@ -610,7 +608,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                 I_OutboundDeliveryTP JOIN I_OutboundDeliveryPartnerTP ON ( I_OutboundDeliveryTP~OutboundDelivery = I_OutboundDeliveryPartnerTP~OutboundDelivery )
              WHERE
                 ( I_OutboundDeliveryPartnerTP~Customer          = @<entity>-PartyID ) AND     " Shipment Group
-                ( I_OutboundDeliveryPartnerTP~PartnerFunction   = 'ZS'              )" AND    " 'Shipment Group'
+                ( I_OutboundDeliveryPartnerTP~PartnerFunction   = 'ZS'              )" AND    " 'Partner Function'
                 "( OverallGoodsMovementStatus                    = 'C'               )        " 'Completely Processed (C)'
             ORDER BY
                 I_OutboundDeliveryTP~OutboundDelivery
@@ -1517,7 +1515,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                 header-CityName          = <entity>-CityName.                                       " 'Kaiseraugst'.
                 header-CountryCode       = <entity>-CountryCode.                                    " 'CH'.
                 header-StreetPostalCode  = <entity>-StreetPostalCode.                               " '4303'.
-                header-DateOfIssue       = formatted_date.                                             " '2022-07-18'.
+                header-DateOfIssue       = formatted_date.                                          " '2022-07-18'.
                 header-CurrencyCode      = customersalesarea-Currency.                              " 'EUR'.
 
 *               Item and Invoice sections:
@@ -1942,6 +1940,229 @@ CLASS lhc_shipment IMPLEMENTATION.
     ENDLOOP.
 
   ENDMETHOD. " create_eci
+
+  METHOD create_exp_decl. " Report for export declaration CH
+
+    DATA salesOrder             TYPE I_SalesOrder.
+    DATA businessPartner        TYPE I_BusinessPartner.
+    DATA businessPartnerAddress TYPE I_BusinessPartnerAddressTP_3.
+    DATA countryText            TYPE I_CountryText.
+    DATA productDescription     TYPE I_ProductDescription.
+
+*   Item
+**Warennummer;Ship-To;;Postal Code;Street;House Number;City;Country/Region;Invoice;Invoice Date;Country of origin;Net Weight;Sales Order;*External Reference;Material;;Net Weight;Invoiced Quantity;Net Value
+*61082200;Schaufelberger AG;2120490;3600;Bälliz;26;Thun;Switzerland;100-10123123;31.10.2023;MA-Marokko;Kilogram;3203677;2068073403;0001319-048-0-042;Moments - brief;0,060;1,00 ea;21,40 CHF
+    DATA BEGIN OF item.
+        DATA f01 TYPE string. " '62121090'.             - *Warennummer (Commodity Code)
+        DATA f02 TYPE string. " 'Schaufelberger AG'.    - Ship-To
+        DATA f03 TYPE string. " '2120490'.
+        DATA f04 TYPE string. " '3600'.                 - Postal Code
+        DATA f05 TYPE string. " 'Bälliz'                - Street
+        DATA f06 TYPE string. " '26'.                   - House Number
+        DATA f07 TYPE string. " 'Thun'.                 - City
+        DATA f08 TYPE string. " 'Switzerland'.          - Country/Region
+        DATA f09 TYPE string. " '100-10123123'.         - Invoice
+        DATA f10 TYPE string. " '31.10.2023'.           - Invoice Date
+        DATA f11 TYPE string. " 'MA-Marokko'.           - Country of origin
+        DATA f12 TYPE string. " 'Kilogram'.             - Net Weight
+        DATA f13 TYPE string. " '3203677'.              - Sales Order
+        DATA f14 TYPE string. " '2068073403'.           - *External Reference
+        DATA f15 TYPE string. " '0001319-048-0-042'.    - Material
+        DATA f16 TYPE string. " 'Moments - brief'.
+        DATA f17 TYPE string. " '0,060'.                - Net Weight (Unit) (Material)
+        DATA f18 TYPE string. " '1,00 ea'.              - Invoiced Quantity (Base Unit)
+        DATA f19 TYPE string. " '40 CHF'.               - Net Value
+    DATA END OF item.
+    DATA it_item LIKE TABLE OF item.
+
+*   Outbound (CSV)
+    DATA it_attachment_create TYPE TABLE FOR CREATE zi_shipment_003\_Attachment.
+
+    " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Shipment
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+        ENDIF.
+        IF ( <entity>-%is_draft = '01' ). " Draft
+        ENDIF.
+
+*       Item and Invoice sections:
+        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment BY \_Outbound
+            ALL FIELDS WITH VALUE #( (
+                %tky = <entity>-%tky
+            ) )
+            RESULT DATA(it_outbound)
+            FAILED DATA(failed1)
+            REPORTED DATA(reported1).
+
+        DATA body TYPE string VALUE ''.
+
+        LOOP AT it_outbound INTO DATA(outbound).
+
+            outbound-OutboundDelivery = |{ outbound-OutboundDelivery ALPHA = IN }|.
+
+            SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO        @DATA(outbounddelivery).
+            SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
+
+            LOOP AT it_outbounddeliveryitem INTO DATA(outbounddeliveryitem).
+
+                SELECT SINGLE * FROM I_BillingDocumentItem  WHERE ( ReferenceSDDocument  = @outbounddeliveryitem-OutboundDelivery ) AND ( ReferenceSDDocumentItem = @outbounddeliveryitem-OutboundDeliveryItem ) INTO @DATA(billingdocumentitem).
+
+                IF ( sy-subrc <> 0 ).
+                    DATA(severity)  = if_abap_behv_message=>severity-error.
+                    DATA msgno TYPE sy-msgno VALUE '001'.
+                    DATA msgid TYPE sy-msgid VALUE 'Z_SHIPMENT_003'.
+                    DATA(msgty)     = 'E'.
+                    DATA(msgv1)     = 'Missing Invoice for Outbound Delivery'.
+                    DATA(msgv2)     = outbounddeliveryitem-OutboundDelivery.
+                    DATA(msgv3)     = '/'.
+                    DATA(msgv4)     = outbounddeliveryitem-OutboundDeliveryItem.
+                    APPEND VALUE #( %key = <entity>-%key %msg = new_message( severity = severity id = msgid number = msgno v1 = msgv1 v2 = msgv2 v3 = msgv3 v4 = msgv4 ) ) TO reported-shipment.
+                    RETURN.
+                ENDIF.
+
+                SELECT SINGLE * FROM I_BillingDocument WHERE ( BillingDocument = @billingdocumentitem-BillingDocument ) INTO @DATA(billingdocument).
+
+*               Commodity Code
+                SELECT SINGLE
+                        *
+                    FROM
+                        C_ProdCommodityCodeForKeyDate( p_keydate = @billingdocument-billingdocumentdate )
+                    WHERE
+                        ( Product = @billingdocumentitem-Product ) AND
+                        ( Country = @billingdocumentitem-DepartureCountry )
+                    INTO
+                        @DATA(prodCommodityCodeForKeyDate).
+
+*                get_commodity_code_internal(
+*                    EXPORTING
+*                        i_code        = CONV string( prodcommoditycodeforkeydate-CommodityCode )
+*                    IMPORTING
+*                        o_code        = DATA(commodityCode)
+*                        o_description = DATA(commodityCodeText)
+*                ).
+
+*               Sales Order
+                CLEAR salesOrder.
+                SELECT SINGLE * FROM I_SalesOrder WHERE ( SalesOrder = @outboundDeliveryItem-ReferenceSDDocument ) INTO @salesOrder.
+
+*               Ship-To party
+                CLEAR businessPartner.
+                SELECT SINGLE * FROM I_BusinessPartner  WHERE ( BusinessPartner = @outboundDelivery-ShipToParty ) INTO @businessPartner.
+
+*               Address Details of Ship-To party
+                CLEAR businessPartnerAddress.
+                SELECT SINGLE * FROM I_BusinessPartnerAddressTP_3  WHERE ( BusinessPartner = @outboundDelivery-ShipToParty ) INTO @businessPartnerAddress.
+
+*               Country Text
+                CLEAR countryText.
+                SELECT SINGLE * FROM I_CountryText  WHERE ( Country = @businessPartnerAddress-Country ) AND ( Language = 'E' ) INTO @countryText.
+
+*               Country Of Origin
+                SELECT SINGLE
+                        ProdPlantInternationalTrade~CountryOfOrigin
+                    FROM
+                        I_ProductTP_2\_ProductPlant\_ProdPlantInternationalTrade as ProdPlantInternationalTrade
+                    WHERE
+                        ( Product = @billingdocumentitem-Product ) AND
+                        ( Plant   = @billingdocumentitem-Plant   ) "  '1000' - Fiege DE
+                    INTO
+                        @DATA(countryOfOrigin).
+
+*               Product Description
+                CLEAR productDescription.
+                SELECT SINGLE * FROM I_ProductDescription  WHERE ( Product = @billingDocumentItem-Product ) AND ( Language = 'E' ) INTO @productDescription.
+
+*               Create Item:
+                CLEAR item.
+                item-f01 = prodcommoditycodeforkeydate-CommodityCode.   " '<62121090>'. - *Warennummer
+                item-f02 = businessPartner-BusinessPartnerName.         " '<Schaufelberger AG>'. " - Ship-To
+                item-f03 = businessPartner-BusinessPartner.             " '<2120490>'.
+                item-f04 = businessPartnerAddress-PostalCode.           " '<3600>'. " - Postal Code
+                item-f05 = businessPartnerAddress-StreetName.           " '<Bälliz>'. " - Street
+                item-f06 = businessPartnerAddress-HouseNumber.          " '<26>'. " - House Number
+                item-f07 = businessPartnerAddress-CityName.             " '<Thun>'. " - City
+                item-f08 = countryText-CountryName.                     " '<Switzerland>'. " - Country/Region
+                item-f09 = billingdocumentitem-BillingDocument.         " '<100-10123123>'. " - Invoice
+                item-f10 = |{ billingdocumentitem-BillingDocumentDate DATE = ISO }|. " '<31.10.2023>'. " - Invoice Date
+                item-f11 = countryOfOrigin.                             " '<MA-Marokko>'. " - Country of origin
+                item-f12 = billingdocumentitem-ItemWeightUnit.          " '<Kilogram>'. " - Net Weight
+                item-f13 = outbound-SalesOrder.                         " '<3203677>'. " - Sales Order
+                item-f14 = outbound-PurchaseOrderByCustomer.            " '<2068073403>'. " - *External Reference
+                item-f15 = outbounddeliveryitem-Product.                " '<0001319-048-0-042>'. " - Material
+                item-f16 = productDescription-ProductDescription.       " '<Moments - brief>'.
+                item-f17 = billingdocumentitem-ItemNetWeight.           " '<0,060>'. " - Net Weight (Unit) (Material)
+                item-f18 = |{ billingdocumentitem-BillingQuantity } { billingdocumentitem-BillingQuantityUnit }|.   " '<1,00 ea>'.   " - Invoiced Quantity (Base Unit)
+                item-f19 = |{ billingdocumentitem-NetAmount } { billingdocumentitem-TransactionCurrency }|.         " '<21,40 CHF>'. " - Net Value (Transactional Currency)
+                APPEND item TO it_item.
+
+            ENDLOOP.
+
+        ENDLOOP.
+
+        body = '*Warennummer;Ship-To;;Postal Code;Street;House Number;City;Country/Region;Invoice;Invoice Date;Country of origin;Net Weight;Sales Order;*External Reference;Material;;Net Weight;Invoiced Quantity;Net Value' && cl_abap_char_utilities=>cr_lf.
+        LOOP AT it_item INTO item.
+                body = body && item-f01 && ';'.
+                body = body && item-f02 && ';'.
+                body = body && item-f03 && ';'.
+                body = body && item-f04 && ';'.
+                body = body && item-f05 && ';'.
+                body = body && item-f06 && ';'.
+                body = body && item-f07 && ';'.
+                body = body && item-f08 && ';'.
+                body = body && item-f09 && ';'.
+                body = body && item-f10 && ';'.
+                body = body && item-f11 && ';'.
+                body = body && item-f12 && ';'.
+                body = body && item-f13 && ';'.
+                body = body && item-f14 && ';'.
+                body = body && item-f15 && ';'.
+                body = body && item-f16 && ';'.
+                body = body && item-f17 && ';'.
+                body = body && item-f18 && ';'.
+                body = body && item-f19 && cl_abap_char_utilities=>cr_lf.
+        ENDLOOP.
+
+*       Convert string To Xstring (binary)
+        DATA(ev_csv) = cl_web_http_utility=>encode_utf8( body ).
+
+        DATA(filename) = 'EXP' && '_' && <entity>-ShipmentID && '.CSV'.
+        DATA(mimetype) = 'text/csv'.
+
+*       Add a New Attachment
+        APPEND VALUE #(
+            %is_draft   = <entity>-%is_draft
+            ShipmentUUID = <entity>-ShipmentUUID
+            %target = VALUE #( (
+                %is_draft       = <entity>-%is_draft
+                %cid            = '1'
+                ShipmentUUID    = <entity>-ShipmentUUID
+                Attachment      = ev_csv
+                FileName        = filename
+                MimeType        = mimetype
+            ) )
+        ) TO it_attachment_create.
+
+        " Create New Items
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment
+            CREATE BY \_Attachment
+            FIELDS ( ShipmentUUID Attachment FileName MimeType )
+            WITH it_attachment_create
+            FAILED DATA(failed3)
+            MAPPED DATA(mapped3)
+            REPORTED DATA(reported3).
+
+    ENDLOOP.
+
+  ENDMETHOD. " create_exp_decl
 
   METHOD on_create. " on initial create
 

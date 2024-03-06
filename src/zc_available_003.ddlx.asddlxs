@@ -46,7 +46,7 @@ annotate entity ZC_AVAILABLE_003 with
     @UI: {  lineItem:       [ { position: 30, label: 'Number of Packages', cssDefault.width: '150px' } ],
             identification: [ { position: 30, label: 'Number of Packages' } ] }
     @EndUserText.label: 'Number of Packages'
-    @UI.hidden: true
+//    @UI.hidden: true
     UnloadingPointName;
 
     @UI: {  lineItem:       [ { position: 40, label: 'Sold To Party', cssDefault.width: '200px' } ],
