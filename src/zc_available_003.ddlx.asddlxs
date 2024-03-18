@@ -70,32 +70,35 @@ annotate entity ZC_AVAILABLE_003 with
     @EndUserText.label: 'Document Date'
     DocumentDate;
 
-    @UI: {  lineItem:       [ { position: 80, label: 'Overall Goods Movement Status', cssDefault.width: '150px' } ],
-            identification: [ { position: 80, label: 'Overall Goods Movement Status' } ] }
-    @EndUserText.label: 'Overall Goods Movement Status'
-    @UI.hidden: true
-    OverallGoodsMovementStatus;
-
-    @UI: {  lineItem:       [ { position: 90, label: 'Overall SD Process Status', cssDefault.width: '150px' } ],
-            identification: [ { position: 90, label: 'Overall SD Process Status' } ] }
-    @EndUserText.label: 'Overall SD Process Status'
-    @UI.hidden: true
-    OverallSDProcessStatus;
-
-    @UI: {  lineItem:       [ { position: 100, label: 'SalesOrder', cssDefault.width: '150px', type: #WITH_URL, url: 'SalesOrderURL' } ],
-            identification: [ { position: 100, label: 'SalesOrder', type: #WITH_URL, url: 'SalesOrderURL' } ] }
-    @EndUserText.label: 'SalesOrder'
+    @UI: {  lineItem:       [ { position: 80, label: 'Sales Order', cssDefault.width: '150px', type: #WITH_URL, url: 'SalesOrderURL' } ],
+            identification: [ { position: 80, label: 'Sales Order', type: #WITH_URL, url: 'SalesOrderURL' } ] }
+    @EndUserText.label: 'Sales Order'
     //@UI.hidden: true
     SalesOrder;
 
-    @UI: {  lineItem:       [ { position: 110, label: 'Customer Reference', cssDefault.width: '150px' } ],
-            identification: [ { position: 110, label: 'Customer Reference' } ] }
+    @UI: {  lineItem:       [ { position: 90, label: 'Customer Reference', cssDefault.width: '150px' } ],
+            identification: [ { position: 90, label: 'Customer Reference' } ] }
     @EndUserText.label: 'Customer Reference'
     //@UI.hidden: true
     PurchaseOrderByCustomer;
     
+    @UI: {  lineItem:       [ { position: 100, label: 'Overall Goods Movement Status', cssDefault.width: '150px' } ],
+            identification: [ { position: 100, label: 'Overall Goods Movement Status' } ] }
+    @EndUserText.label: 'Overall Goods Movement Status'
+    //@UI.hidden: true
+    OverallGoodsMovementStatus;
+
+    @UI: {  lineItem:       [ { position: 110, label: 'Overall SD Process Status', cssDefault.width: '150px' } ],
+            identification: [ { position: 110, label: 'Overall SD Process Status' } ] }
+    @EndUserText.label: 'Overall SD Process Status'
+    @UI.hidden: true
+    OverallSDProcessStatus;
+
     @UI.hidden: true
     OutboundDeliveryURL;
+
+    @UI.hidden: true
+    SalesOrderURL;
 
     @UI.hidden: true
     CreatedBy;
