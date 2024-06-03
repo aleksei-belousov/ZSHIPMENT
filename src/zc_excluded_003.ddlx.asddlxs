@@ -1,0 +1,69 @@
+@Metadata.layer: #CORE
+@UI: {
+    headerInfo: { typeName: 'Excluded Deliveries',
+                  typeNamePlural: 'Excluded Deliveries',
+                  title: { type: #STANDARD, label: 'Excluded Deliveries', value: 'ExcludedUUID' } },
+    presentationVariant: [{ sortOrder: [{ by: 'ExcludedUUID', direction: #ASC }] }] }
+@Search.searchable: true
+
+annotate entity ZC_EXCLUDED_003  with 
+{
+
+    @UI.facet: [
+        {
+            id:            'Excluded',
+            purpose:       #STANDARD,
+            type:          #IDENTIFICATION_REFERENCE,
+            label:         'Excluded Deliveries',
+            position:      10
+        }
+    ]
+
+    @UI.hidden: true
+    ExcludedUUID;
+
+    @UI: {  lineItem:       [ { position: 10, label: 'Outbound Delivery', cssDefault.width: '100px', type: #WITH_URL, url: 'OutboundDeliveryURL' } ],
+            identification: [ { position: 10, label: 'Outbound Delivery', type: #WITH_URL, url: 'OutboundDeliveryURL' } ] }
+    @EndUserText.label: 'Outbound Delivery'
+    @Search.defaultSearchElement 
+    @Consumption.valueHelpDefinition: [ { entity: { name: 'I_OutboundDeliveryTP', element: 'OutboundDelivery' } } ] 
+//    @UI.hidden: true
+    OutboundDelivery;
+
+
+    @UI: {  lineItem:       [ { position: 20, label: 'Sales Order', cssDefault.width: '100px', type: #WITH_URL, url: 'SalesOrderURL' } ],
+            identification: [ { position: 20, label: 'Sales Order', type: #WITH_URL, url: 'SalesOrderURL' } ] }
+    @EndUserText.label: 'Sales Order'
+    @Search.defaultSearchElement 
+//    @UI.hidden: true
+    SalesOrder;
+
+    @UI: {  lineItem:       [ { position: 30, label: 'Customer Reference', cssDefault.width: '100px' } ],
+            identification: [ { position: 30, label: 'Customer Reference' } ] }
+    @EndUserText.label: 'Customer Reference'
+    @Search.defaultSearchElement 
+//    @UI.hidden: true
+    PurchaseOrderByCustomer;
+
+    @UI.hidden: true
+    OutboundDeliveryURL;
+
+    @UI.hidden: true
+    SalesOrderURL;
+
+    @UI.hidden: true
+    CreatedBy;
+
+    @UI.hidden: true
+    CreatedAt;
+
+    @UI.hidden: true
+    LastChangedBy;
+
+    @UI.hidden: true
+    LastChangedAt;
+
+    @UI.hidden: true
+    LocalLastChangedAt;
+    
+}

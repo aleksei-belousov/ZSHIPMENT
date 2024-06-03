@@ -39,9 +39,15 @@ CLASS lhc_shipment DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
     METHODS release FOR MODIFY  IMPORTING keys FOR ACTION Shipment~release.
 
+    METHODS select_all_added FOR MODIFY IMPORTING keys FOR ACTION Shipment~select_all_added.
+
+    METHODS select_all_available FOR MODIFY IMPORTING keys FOR ACTION Shipment~select_all_available.
+
     METHODS add FOR MODIFY IMPORTING keys FOR ACTION Shipment~add.
 
     METHODS remove FOR MODIFY IMPORTING keys FOR ACTION Shipment~remove.
+
+    METHODS exclude_from_available FOR MODIFY IMPORTING keys FOR ACTION Shipment~exclude_from_available.
 
 ******** Internal Methods *********
 
@@ -140,6 +146,225 @@ CLASS lhc_shipment IMPLEMENTATION.
 
   METHOD Resume.
   ENDMETHOD. " Resume
+
+  METHOD retrieve. " on Pressing Retrieve button
+
+*   Available
+    DATA it_available_delete TYPE TABLE FOR DELETE zi_shipment_003\\Available.
+    DATA it_available_create TYPE TABLE FOR CREATE zi_shipment_003\_Available.
+
+    " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Shipment
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-Released = abap_true ).
+*           Short format message
+            APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'Shipment Binding is already released.' ) ) TO reported-shipment.
+            RETURN.
+        ENDIF.
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+        ENDIF.
+
+        IF ( <entity>-%is_draft = '01' ). " Draft
+        ENDIF.
+
+*       Read Available
+        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment BY \_Available
+            ALL FIELDS WITH VALUE #( (
+                %tky = <entity>-%tky
+            ) )
+            RESULT DATA(availables)
+            FAILED DATA(failed1)
+            REPORTED DATA(reported1).
+
+        DATA available LIKE LINE OF availables.
+        LOOP AT availables INTO available.
+            APPEND VALUE #( %tky = available-%tky ) TO it_available_delete.
+        ENDLOOP.
+
+*       Delete Available
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Available
+            DELETE FROM it_available_delete
+            FAILED DATA(failed2)
+            MAPPED DATA(mapped2)
+            REPORTED DATA(reported2).
+
+*       Read all relevant Outbound Deliveries
+        SELECT
+                I_OutboundDeliveryTP~OutboundDelivery
+             FROM
+                I_OutboundDeliveryTP JOIN I_OutboundDeliveryPartnerTP ON ( I_OutboundDeliveryTP~OutboundDelivery = I_OutboundDeliveryPartnerTP~OutboundDelivery )
+             WHERE
+                ( I_OutboundDeliveryPartnerTP~Customer          = @<entity>-PartyID ) AND   " Shipment Group
+                ( I_OutboundDeliveryPartnerTP~PartnerFunction   = 'ZS'              ) AND   " 'Partner Function'
+                "( I_OutboundDeliveryTP~OverallGoodsMovementStatus = 'C'               ) AND    " 'Completely Processed (C)'
+                "( I_OutboundDeliveryTP~YY1_ExceptSB_DLH         = ' '               )       " 'Except Shipping Binding'
+                ( I_OutboundDeliveryTP~ShippingPoint            = '100A'            )       " 'Shipment Point'
+            ORDER BY
+                I_OutboundDeliveryTP~OutboundDelivery
+            INTO TABLE
+                @DATA(lt_outbounddelivery).
+
+*       Read Outbiund (for filtering)
+        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment BY \_Outbound
+            ALL FIELDS WITH VALUE #( (
+                %tky = <entity>-%tky
+            ) )
+            RESULT DATA(outbounds)
+            FAILED DATA(failed3)
+            REPORTED DATA(reported3).
+
+        DATA tabix TYPE sy-tabix.
+        LOOP AT lt_outbounddelivery INTO DATA(outbounddelivery).
+            tabix = sy-tabix.
+            DATA(ok) = abap_true.
+*           Check if excluded
+            SELECT SINGLE * FROM zi_excluded_003 WHERE ( OutboundDelivery = @outbounddelivery-OutboundDelivery ) INTO @DATA(zi_excluded_003).
+            IF ( sy-subrc = 0 ).
+                ok = abap_false.
+            ENDIF.
+*           Check if has already been used in other shipments
+            SELECT SINGLE * FROM zi_outbound_003 WHERE ( OutboundDelivery = @outbounddelivery-OutboundDelivery ) AND ( ShipmentUUID <> @<entity>-ShipmentUUID ) INTO @DATA(zi_outbound_003).
+            IF ( sy-subrc = 0 ).
+                ok = abap_false.
+            ENDIF.
+*           Check if has already been used in  (added to) this shipment
+            READ TABLE outbounds  WITH KEY OutboundDelivery = outbounddelivery-OutboundDelivery TRANSPORTING NO FIELDS.
+            IF ( sy-subrc = 0 ).
+                ok = abap_false.
+            ENDIF.
+            IF ( ok = abap_true ).
+*               Add a New Available
+                APPEND VALUE #(
+                    %tky = <entity>-%tky
+                    %target = VALUE #( (
+                        %cid                = tabix
+                        %is_draft           = <entity>-%is_draft
+                        ShipmentUUID        = <entity>-ShipmentUUID
+                        OutboundDelivery    = outbounddelivery-OutboundDelivery
+                    ) )
+                ) TO it_available_create.
+            ENDIF.
+        ENDLOOP.
+
+*       Create New Available
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment
+            CREATE BY \_Available
+            FIELDS ( ShipmentUUID OutboundDelivery )
+            WITH it_available_create
+            FAILED DATA(failed4)
+            MAPPED DATA(mapped4)
+            REPORTED DATA(reported4).
+
+    ENDLOOP.
+
+  ENDMETHOD. " retrieve
+
+  METHOD select_all_available.  " on pressing Select all Available button
+
+    DATA it_available_update TYPE TABLE FOR UPDATE zi_shipment_003\\Available.
+
+    " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Shipment
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+        ENDIF.
+
+        IF ( <entity>-%is_draft = '01' ). " Draft
+        ENDIF.
+
+*       Read Available
+        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment BY \_Available
+            ALL FIELDS WITH VALUE #( (
+                %tky = <entity>-%tky
+            ) )
+            RESULT DATA(availables)
+            FAILED DATA(failed1)
+            REPORTED DATA(reported1).
+
+        LOOP AT availables INTO DATA(available).
+            APPEND VALUE #(
+                %tky        = available-%tky
+                Selected    = abap_true
+            ) TO it_available_update.
+        ENDLOOP.
+
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Available
+            UPDATE FIELDS ( Selected )
+            WITH it_available_update
+            FAILED DATA(failed2)
+            MAPPED DATA(mapped2)
+            REPORTED DATA(reported2).
+
+    ENDLOOP.
+
+  ENDMETHOD. " select_all_available
+
+  METHOD select_all_added. "   " on pressing Select all Added button
+
+    DATA it_outbound_update TYPE TABLE FOR UPDATE zi_shipment_003\\Outbound.
+
+    " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Shipment
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+        ENDIF.
+
+        IF ( <entity>-%is_draft = '01' ). " Draft
+        ENDIF.
+
+*       Read Available
+        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment BY \_Outbound
+            ALL FIELDS WITH VALUE #( (
+                %tky = <entity>-%tky
+            ) )
+            RESULT DATA(outbounds)
+            FAILED DATA(failed1)
+            REPORTED DATA(reported1).
+
+        LOOP AT outbounds INTO DATA(outbound).
+            APPEND VALUE #(
+                %tky        = outbound-%tky
+                Selected    = abap_true
+            ) TO it_outbound_update.
+        ENDLOOP.
+
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Outbound
+            UPDATE FIELDS ( Selected )
+            WITH it_outbound_update
+            FAILED DATA(failed2)
+            MAPPED DATA(mapped2)
+            REPORTED DATA(reported2).
+
+    ENDLOOP.
+
+  ENDMETHOD. "select_all_added
 
   METHOD add. " on pressing Add button
 
@@ -433,6 +658,19 @@ CLASS lhc_shipment IMPLEMENTATION.
                 IF ( system_url(8) = 'my404898' ). " dev-cust
                     i_url = 'https://felina-hu-scpi-test-eyjk96r2.it-cpi018-rt.cfapps.eu10-003.hana.ondemand.com/http/FiegeOutboundDevCust'.
                 ENDIF.
+                IF ( system_url(8) = 'my404907' ). " test
+                    i_url = 'https://felina-hu-scpi-test-eyjk96r2.it-cpi018-rt.cfapps.eu10-003.hana.ondemand.com/http/FiegeShipmentBindingRequest'.
+                ENDIF.
+
+*Shipment na release:
+*URL: https://felinahuscpi.it-cpi001-rt.cfapps.eu10.hana.ondemand.com/http/FiegeShipmentBindingRequest
+*username: sb-d6f68eaf-c42b-4ab0-931d-60753301674e!b102052|it-rt-felinahuscpi!b16077
+*passwrod: 462ff083-e299-4fb6-a44f-3b627fd8b406$XlkjK6-n64zyzYZkjk45eANimRNA-nMD8Pe3TKppq9w=
+                IF ( system_url(8) = 'my410080' ). " prod
+                    i_url       = 'https://felinahuscpi.it-cpi001-rt.cfapps.eu10.hana.ondemand.com/http/FiegeShipmentBindingRequest'.
+                    i_username  = 'sb-d6f68eaf-c42b-4ab0-931d-60753301674e!b102052|it-rt-felinahuscpi!b16077'.
+                    i_password  = '462ff083-e299-4fb6-a44f-3b627fd8b406$XlkjK6-n64zyzYZkjk45eANimRNA-nMD8Pe3TKppq9w='.
+                ENDIF.
 
                 DATA(http_destination) = cl_http_destination_provider=>create_by_url(
                     i_url = i_url
@@ -550,122 +788,6 @@ CLASS lhc_shipment IMPLEMENTATION.
     ENDLOOP.
 
   ENDMETHOD. " release
-
-  METHOD retrieve. " on Pressing Retrieve button
-
-*   Available
-    DATA it_available_delete TYPE TABLE FOR DELETE zi_shipment_003\\Available.
-    DATA it_available_create TYPE TABLE FOR CREATE zi_shipment_003\_Available.
-
-    " Read transfered instances
-    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
-        ENTITY Shipment
-        ALL FIELDS
-        WITH CORRESPONDING #( keys )
-        RESULT DATA(entities).
-
-    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
-
-        IF ( <entity>-Released = abap_true ).
-*           Short format message
-            APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'Shipment Binding is already released.' ) ) TO reported-shipment.
-            RETURN.
-        ENDIF.
-
-        IF ( <entity>-%is_draft = '00' ). " Saved
-        ENDIF.
-
-        IF ( <entity>-%is_draft = '01' ). " Draft
-        ENDIF.
-
-*       Read Available
-        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
-            ENTITY Shipment BY \_Available
-            ALL FIELDS WITH VALUE #( (
-                %tky = <entity>-%tky
-            ) )
-            RESULT DATA(availables)
-            FAILED DATA(failed1)
-            REPORTED DATA(reported1).
-
-        DATA available LIKE LINE OF availables.
-        LOOP AT availables INTO available.
-            APPEND VALUE #( %tky = available-%tky ) TO it_available_delete.
-        ENDLOOP.
-
-*       Delete Available
-        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
-            ENTITY Available
-            DELETE FROM it_available_delete
-            FAILED DATA(failed2)
-            MAPPED DATA(mapped2)
-            REPORTED DATA(reported2).
-
-*       Read all relevant Outbound Deliveries
-        SELECT
-                I_OutboundDeliveryTP~OutboundDelivery
-             FROM
-                I_OutboundDeliveryTP JOIN I_OutboundDeliveryPartnerTP ON ( I_OutboundDeliveryTP~OutboundDelivery = I_OutboundDeliveryPartnerTP~OutboundDelivery )
-             WHERE
-                ( I_OutboundDeliveryPartnerTP~Customer          = @<entity>-PartyID ) AND     " Shipment Group
-                ( I_OutboundDeliveryPartnerTP~PartnerFunction   = 'ZS'              )" AND    " 'Partner Function'
-                "( OverallGoodsMovementStatus                    = 'C'               )        " 'Completely Processed (C)'
-            ORDER BY
-                I_OutboundDeliveryTP~OutboundDelivery
-            INTO TABLE
-                @DATA(lt_outbounddelivery).
-
-*       Read Outbiund (for filtering)
-        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
-            ENTITY Shipment BY \_Outbound
-            ALL FIELDS WITH VALUE #( (
-                %tky = <entity>-%tky
-            ) )
-            RESULT DATA(outbounds)
-            FAILED DATA(failed3)
-            REPORTED DATA(reported3).
-
-        DATA tabix TYPE sy-tabix.
-        LOOP AT lt_outbounddelivery INTO DATA(outbounddelivery).
-            tabix = sy-tabix.
-            DATA(ok) = abap_true.
-*           Check if has already been used in other shipments
-            SELECT SINGLE * FROM zi_outbound_003 WHERE ( OutboundDelivery = @outbounddelivery-OutboundDelivery ) INTO @DATA(zi_outbound_003).
-            IF ( sy-subrc = 0 ).
-                ok = abap_false.
-            ENDIF.
-*           Check if has already been used in  (added to) this shipment
-            READ TABLE outbounds  WITH KEY OutboundDelivery = outbounddelivery-OutboundDelivery TRANSPORTING NO FIELDS.
-            IF ( sy-subrc = 0 ).
-                ok = abap_false.
-            ENDIF.
-            IF ( ok = abap_true ).
-*               Add a New Available
-                APPEND VALUE #(
-                    %tky = <entity>-%tky
-                    %target = VALUE #( (
-                        %cid                = tabix
-                        %is_draft           = <entity>-%is_draft
-                        ShipmentUUID        = <entity>-ShipmentUUID
-                        OutboundDelivery    = outbounddelivery-OutboundDelivery
-                    ) )
-                ) TO it_available_create.
-            ENDIF.
-        ENDLOOP.
-
-*       Create New Available
-        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
-            ENTITY Shipment
-            CREATE BY \_Available
-            FIELDS ( ShipmentUUID OutboundDelivery )
-            WITH it_available_create
-            FAILED DATA(failed4)
-            MAPPED DATA(mapped4)
-            REPORTED DATA(reported4).
-
-    ENDLOOP.
-
-  ENDMETHOD. " retrieve
 
   METHOD create_invoice. " on Create Invoice
 
@@ -818,8 +940,9 @@ CLASS lhc_shipment IMPLEMENTATION.
 
                     outbound-OutboundDelivery = |{ outbound-OutboundDelivery ALPHA = IN }|.
 
-                    SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO        @DATA(outbounddelivery).
-                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
+                    SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO @DATA(outbounddelivery).
+*                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO TABLE @DATA(it_outbounddeliveryitem).
+                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) AND ( DeliveryDocumentItemCategory <> 'CBLN' ) INTO TABLE @DATA(it_outbounddeliveryitem).
 
                     LOOP AT it_outbounddeliveryitem INTO DATA(outbounddeliveryitem).
 
@@ -1195,11 +1318,24 @@ CLASS lhc_shipment IMPLEMENTATION.
                     outbound-OutboundDelivery = |{ outbound-OutboundDelivery ALPHA = IN }|.
 
                     SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO        @DATA(outbounddelivery).
-                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
+*                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
+                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) AND ( DeliveryDocumentItemCategory <> 'CBLN' ) INTO TABLE @DATA(it_outbounddeliveryitem).
 
                     LOOP AT it_outbounddeliveryitem INTO DATA(outbounddeliveryitem).
 
-                        SELECT SINGLE * FROM I_BillingDocumentItem  WHERE ( ReferenceSDDocument  = @outbounddeliveryitem-OutboundDelivery ) AND ( ReferenceSDDocumentItem = @outbounddeliveryitem-OutboundDeliveryItem ) INTO @DATA(billingdocumentitem).
+*                        [10:09 AM] Benedikt Pecuch - vedeli by sme spravit tak aby bralo iba tie ktore zacinaju "DE" ?
+*                        SELECT SINGLE * FROM I_BillingDocumentItem  WHERE ( ReferenceSDDocument  = @outbounddeliveryitem-OutboundDelivery ) AND ( ReferenceSDDocumentItem = @outbounddeliveryitem-OutboundDeliveryItem ) INTO @DATA(billingdocumentitem).
+                        SELECT SINGLE
+                                *
+                            FROM
+                                I_BillingDocumentItem
+                            WHERE
+                                ( ReferenceSDDocument           = @outbounddeliveryitem-OutboundDelivery     ) AND
+                                ( ReferenceSDDocumentItem       = @outbounddeliveryitem-OutboundDeliveryItem ) AND
+                                ( LEFT( BillingDocument, 2 )    = 'DE' )
+                            INTO
+                                @DATA(billingdocumentitem).
+
                         IF ( sy-subrc <> 0 ).
                             DATA(severity)  = if_abap_behv_message=>severity-error.
                             DATA msgno TYPE sy-msgno VALUE '001'.
@@ -1532,12 +1668,25 @@ CLASS lhc_shipment IMPLEMENTATION.
 
                     outbound-OutboundDelivery = |{ outbound-OutboundDelivery ALPHA = IN }|.
 
-                    SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO        @DATA(outbounddelivery).
-                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
+                    SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO @DATA(outbounddelivery).
+*                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO TABLE @DATA(it_outbounddeliveryitem).
+                    SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) AND ( DeliveryDocumentItemCategory <> 'CBLN' ) INTO TABLE @DATA(it_outbounddeliveryitem).
 
                     LOOP AT it_outbounddeliveryitem INTO DATA(outbounddeliveryitem).
 
-                        SELECT SINGLE * FROM I_BillingDocumentItem  WHERE ( ReferenceSDDocument  = @outbounddeliveryitem-OutboundDelivery ) AND ( ReferenceSDDocumentItem = @outbounddeliveryitem-OutboundDeliveryItem ) INTO @DATA(billingdocumentitem).
+*                        [10:09 AM] Benedikt Pecuch - vedeli by sme spravit tak aby bralo iba tie ktore zacinaju "DE" ?
+*                        SELECT SINGLE * FROM I_BillingDocumentItem  WHERE ( ReferenceSDDocument  = @outbounddeliveryitem-OutboundDelivery ) AND ( ReferenceSDDocumentItem = @outbounddeliveryitem-OutboundDeliveryItem ) INTO @DATA(billingdocumentitem).
+                        SELECT SINGLE
+                                *
+                            FROM
+                                I_BillingDocumentItem
+                            WHERE
+                                ( ReferenceSDDocument           = @outbounddeliveryitem-OutboundDelivery      ) AND
+                                ( ReferenceSDDocumentItem       = @outbounddeliveryitem-OutboundDeliveryItem  ) AND
+                                ( LEFT( BillingDocument, 2 )    = 'DE' )
+                            INTO
+                                @DATA(billingdocumentitem).
+
                         IF ( sy-subrc <> 0 ).
                             DATA(severity)  = if_abap_behv_message=>severity-error.
                             DATA msgno TYPE sy-msgno VALUE '001'.
@@ -1550,7 +1699,7 @@ CLASS lhc_shipment IMPLEMENTATION.
                             APPEND VALUE #( %key = <entity>-%key %msg = new_message( severity = severity id = msgid number = msgno v1 = msgv1 v2 = msgv2 v3 = msgv3 v4 = msgv4 ) ) TO reported-shipment.
                             RETURN.
                         ENDIF.
-                        SELECT SINGLE * FROM I_BillingDocument      WHERE ( BillingDocument      = @billingdocumentitem-BillingDocument ) INTO @DATA(billingdocument).
+                        SELECT SINGLE * FROM I_BillingDocument WHERE ( BillingDocument = @billingdocumentitem-BillingDocument ) INTO @DATA(billingdocument).
 
 *                       Commodity Code
                         SELECT SINGLE
@@ -1859,7 +2008,8 @@ CLASS lhc_shipment IMPLEMENTATION.
             SELECT SINGLE * FROM I_OutboundDelivery WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO @DATA(outboundDelivery).
 
 *           Outbound Delivery Item
-            SELECT SINGLE * FROM I_OutboundDeliveryItem WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO @DATA(outboundDeliveryItem).
+*            SELECT SINGLE * FROM I_OutboundDeliveryItem WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO @DATA(outboundDeliveryItem).
+            SELECT SINGLE * FROM I_OutboundDeliveryItem WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) AND ( DeliveryDocumentItemCategory <> 'CBLN' ) INTO @DATA(outboundDeliveryItem).
 
 *           Sales Order
             SELECT SINGLE * FROM I_SalesOrder WHERE ( SalesOrder = @outboundDeliveryItem-ReferenceSDDocument ) INTO @DATA(salesOrder).
@@ -2009,7 +2159,8 @@ CLASS lhc_shipment IMPLEMENTATION.
             outbound-OutboundDelivery = |{ outbound-OutboundDelivery ALPHA = IN }|.
 
             SELECT SINGLE   * FROM I_OutboundDelivery       WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO        @DATA(outbounddelivery).
-            SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
+*            SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) INTO TABLE  @DATA(it_outbounddeliveryitem).
+            SELECT          * FROM I_OutboundDeliveryItem   WHERE ( OutboundDelivery = @outbound-OutboundDelivery ) AND ( DeliveryDocumentItemCategory <> 'CBLN' ) INTO TABLE @DATA(it_outbounddeliveryitem).
 
             LOOP AT it_outbounddeliveryitem INTO DATA(outbounddeliveryitem).
 
@@ -2107,7 +2258,8 @@ CLASS lhc_shipment IMPLEMENTATION.
 
         ENDLOOP.
 
-        body = '*Warennummer;Ship-To;;Postal Code;Street;House Number;City;Country/Region;Invoice;Invoice Date;Country of origin;Net Weight;Sales Order;*External Reference;Material;;Net Weight;Invoiced Quantity;Net Value' && cl_abap_char_utilities=>cr_lf.
+        body = '*Warennummer;Ship-To;;Postal Code;Street;House Number;City;Country/Region;Invoice;Invoice Date;Country of origin;Net Weight;Sales Order;*External Reference;Material;;Net Weight;Invoiced Quantity;Net Value' && cl_abap_char_utilities=>cr_lf
+.
         LOOP AT it_item INTO item.
                 body = body && item-f01 && ';'.
                 body = body && item-f02 && ';'.
@@ -2394,6 +2546,77 @@ CLASS lhc_shipment IMPLEMENTATION.
 
   ENDMETHOD. " on_modify_recipient
 
+  METHOD exclude_from_available.
+
+    DATA it_available_delete    TYPE TABLE FOR DELETE zi_shipment_003\\Available.
+    DATA it_excluded_create     TYPE TABLE FOR CREATE zi_excluded_003.
+
+    " Read transfered instances
+    READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+        ENTITY Shipment
+        ALL FIELDS
+        WITH CORRESPONDING #( keys )
+        RESULT DATA(entities).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+        IF ( <entity>-Released = abap_true ).
+*           Short format message
+            APPEND VALUE #( %key = <entity>-%key %msg = new_message_with_text( severity = if_abap_behv_message=>severity-error text = 'Shipment Binding is already released.' ) ) TO reported-shipment.
+            RETURN.
+        ENDIF.
+
+        IF ( <entity>-%is_draft = '00' ). " Saved
+        ENDIF.
+        IF ( <entity>-%is_draft = '01' ). " Draft
+        ENDIF.
+
+*       Read Available
+        READ ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Shipment BY \_Available
+            ALL FIELDS WITH VALUE #( (
+                %tky = <entity>-%tky
+            ) )
+            RESULT DATA(availables)
+            FAILED DATA(failed1)
+            REPORTED DATA(reported1).
+
+*       List of Available to exclude
+        DATA available LIKE LINE OF availables.
+        LOOP AT availables INTO available WHERE ( Selected = abap_true ).
+            APPEND VALUE #(
+                %cid                = sy-tabix
+                %is_draft           = '00' " <entity>-%is_draft (save right away)
+                OutboundDelivery    = available-OutboundDelivery
+            ) TO it_excluded_create.
+        ENDLOOP.
+
+*       Create Excluded
+        MODIFY ENTITIES OF zi_excluded_003
+            ENTITY Excluded
+            CREATE FIELDS ( OutboundDelivery )
+            WITH it_excluded_create
+            MAPPED DATA(mapped2)
+            FAILED DATA(failed2)
+            REPORTED DATA(reported2).
+
+*       List of Available to delete
+        LOOP AT availables INTO available WHERE ( Selected = abap_true ).
+            APPEND VALUE #( %tky = available-%tky ) TO it_available_delete.
+        ENDLOOP.
+
+*       Delete Available
+        MODIFY ENTITIES OF zi_shipment_003 IN LOCAL MODE
+            ENTITY Available
+            DELETE FROM it_available_delete
+            FAILED DATA(failed3)
+            MAPPED DATA(mapped3)
+            REPORTED DATA(reported3).
+
+    ENDLOOP.
+
+  ENDMETHOD. " exclude_from_available
+
   METHOD get_texts_internal.
 
 * https://my404907.s4hana.cloud.sap/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_CustomerSalesAreaText(Customer='GKK',SalesOrganization='1000',DistributionChannel='10',Division='00',Language='EN',LongTextID='ZFW1')
@@ -2427,10 +2650,14 @@ CLASS lhc_shipment IMPLEMENTATION.
 
         DATA i_username TYPE string VALUE 'INBOUND_USER'.
         DATA i_password TYPE string VALUE 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
-*        IF ( system_url(8) = 'my404907' ). " test
-*            i_username = 'INBOUND_FIEGE_USER'.
-*            i_password = 'JpLftkzhkoktLzvvoxD6oWeXsM#ZXccgfsBBzRpg'.
-*        ENDIF.
+        IF ( system_url(8) = 'my404907' ). " test
+            i_username = 'INBOUND_USER'.
+            i_password = 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
+        ENDIF.
+        IF ( system_url(8) = 'my410080' ). " prod
+            i_username = 'INBOUND_USER'.
+            i_password = 'YKXMYdjNnGgqko&aEueVx5mHTFPRGcDGAVgQgnFh'.
+        ENDIF.
 
         DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url = i_url ).
 
@@ -2498,10 +2725,14 @@ CLASS lhc_shipment IMPLEMENTATION.
 
         DATA i_username TYPE string VALUE 'INBOUND_USER'.
         DATA i_password TYPE string VALUE 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
-*        IF ( system_url(8) = 'my404907' ). " test
-*            i_username = 'INBOUND_FIEGE_USER'.
-*            i_password = 'JpLftkzhkoktLzvvoxD6oWeXsM#ZXccgfsBBzRpg'.
-*        ENDIF.
+        IF ( system_url(8) = 'my404907' ). " test
+            i_username = 'INBOUND_USER'.
+            i_password = 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
+        ENDIF.
+        IF ( system_url(8) = 'my410080' ). " prod
+            i_username = 'INBOUND_USER'.
+            i_password = 'YKXMYdjNnGgqko&aEueVx5mHTFPRGcDGAVgQgnFh'.
+        ENDIF.
 
         DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url = i_url ).
 
@@ -2619,6 +2850,10 @@ CLASS lhc_shipment IMPLEMENTATION.
         IF ( system_url(8) = 'my404907' ). " test
             i_username = 'INBOUND_FIEGE_USER'.
             i_password = 'JpLftkzhkoktLzvvoxD6oWeXsM#ZXccgfsBBzRpg'.
+        ENDIF.
+        IF ( system_url(8) = 'my410080' ). " prod
+            i_username = 'INBOUND_FIEGE_USER'.
+            i_password = 'NjQbAZlnTaCcX)XidbvNbGRtPjT8grcVBizFwgCW'.
         ENDIF.
 
         DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url = i_url ).
@@ -2818,169 +3053,169 @@ CLASS lhc_shipment IMPLEMENTATION.
     RETURN.
 
 *   ...till better times:
-    DATA system_url TYPE string.
-
-    DATA i_username TYPE string VALUE 'INBOUND_USER'.
-    DATA i_password TYPE string VALUE 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
-
-    DATA text   TYPE string.
-    DATA s1     TYPE string.
-    DATA s2     TYPE string.
-    DATA s3     TYPE string.
-
-    TRY.
-
-* DATA(i_url) = 'https://my404898.s4hana.cloud.sap/sap/opu/odata/sap/YY1_COMMODITYCODE_CDS/YY1_COMMODITYCODE'.
-
-        system_url = cl_abap_context_info=>get_system_url( ).
-
-*       Read list of objects and get UUID of the first
-        CONCATENATE
-                'https://'
-                system_url(8) " my404898
-                '-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_COMMODITYCODE_CDS/YY1_COMMODITYCODE'
-            INTO DATA(i_url).
-
-        DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url = i_url ).
-
-        DATA(lo_http_client) = cl_web_http_client_manager=>create_by_http_destination( http_destination ).
-
-        lo_http_client->get_http_request( )->set_authorization_basic(
-            i_username = i_username
-            i_password = i_password
-        ).
-
-        DATA(lo_http_request) = lo_http_client->get_http_request( ).
-
-        DATA(lo_http_response) = lo_http_client->execute(
-            i_method   = if_web_http_client=>get
-        ).
-
-        text                          = lo_http_response->get_text( ).
-        DATA(status)                  = lo_http_response->get_status( ).
-        DATA(response_header_fields)  = lo_http_response->get_header_fields( ).
-
-        REPLACE '<d:SAP_UUID>'    IN text WITH '******'.
-        REPLACE '</d:SAP_UUID>'   IN text WITH '******'.
-        SPLIT text AT '******' INTO s1 s2 s3.
-
-        DATA(sap_uuid) = s2.
-
-        CONCATENATE
-                'https://'
-                system_url(8) " my404898
-                '-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_COMMODITYCODE_CDS/YY1_COMMODITYCODE'
-                '(guid''' sap_uuid ''')' " '91bf6b38-1c0f-1ede-b2cf-0d3f0b77f0ff'
-            INTO i_url.
-
-        http_destination = cl_http_destination_provider=>create_by_url( i_url = i_url ).
-
-        lo_http_client = cl_web_http_client_manager=>create_by_http_destination( http_destination ).
-
-        lo_http_client->get_http_request( )->set_authorization_basic(
-            i_username = i_username
-            i_password = i_password
-        ).
-
-        lo_http_request = lo_http_client->get_http_request( ).
-
-*       Get Token:
-
-        lo_http_request->set_header_field(
-            i_name  = 'x-csrf-token'
-            i_value = 'fetch'
-        ).
-
-        lo_http_response = lo_http_client->execute(
-            i_method   = if_web_http_client=>get
-        ).
-
-        text                   = lo_http_response->get_text( ).
-        status                 = lo_http_response->get_status( ).
-        response_header_fields = lo_http_response->get_header_fields( ).
-
-*        DATA token TYPE string.
-        READ TABLE response_header_fields WITH KEY name = 'x-csrf-token' INTO DATA(field).
-        IF ( sy-subrc = 0 ).
-            DATA(token) = field-value.
-        ENDIF.
-
-*       Update Code:
-
-        DATA i_fields TYPE if_web_http_request=>name_value_pairs.
-        APPEND VALUE #(
-            name  = 'x-csrf-token'
-            value = token " '5iGZK1qT45Vi4UfHYazbPQ=='
-        )
-        TO i_fields.
-        APPEND VALUE #(
-            name  = 'Content-Type'
-            value = 'application/json'
-        )
-        TO i_fields.
-
-        lo_http_request->set_header_fields(
-          EXPORTING
-            i_fields = i_fields
-        ).
-
-        lo_http_request->set_text(
-            i_text   = '{"CODE":"' && i_code && '"}' " '62149000'
-        ).
-
-        lo_http_response = lo_http_client->execute(
-            i_method   = if_web_http_client=>put
-        ).
-
-        text                      = lo_http_response->get_text( ).
-        status                    = lo_http_response->get_status( ).
-        response_header_fields    = lo_http_response->get_header_fields( ).
-
-*       Read Description
-
-        lo_http_response = lo_http_client->execute(
-            i_method   = if_web_http_client=>get
-        ).
-
-        text                    = lo_http_response->get_text( ).
-        status                  = lo_http_response->get_status( ).
-        response_header_fields  = lo_http_response->get_header_fields( ).
-
-        REPLACE '<d:CODE>'    IN text WITH '***CODE***'.
-        REPLACE '</d:CODE>'   IN text WITH '***CODE***'.
-        SPLIT text AT '***CODE***' INTO s1 s2 s3.
-        o_code = s2.
-
-        REPLACE '<d:DESCRIPTION>'    IN text WITH '***DESCRIPTION***'.
-        REPLACE '</d:DESCRIPTION>'   IN text WITH '***DESCRIPTION***'.
-        SPLIT text AT '***DESCRIPTION***' INTO s1 s2 s3.
-        o_description = s2.
-
-    CATCH cx_web_message_error INTO DATA(lx_web_message_error).
-      " Handle Exception
-*      RAISE SHORTDUMP lx_web_message_error.
-
-    CATCH cx_abap_context_info_error INTO DATA(lx_abap_context_info_error).
-      " Handle Exception
-*      RAISE SHORTDUMP lx_abap_context_info_error.
-
-    CATCH /iwbep/cx_cp_remote INTO DATA(lx_remote).
-      " Handle remote Exception
-*      RAISE SHORTDUMP lx_remote.
-
-    CATCH /iwbep/cx_gateway INTO DATA(lx_gateway).
-      " Handle Exception
-*      RAISE SHORTDUMP lx_gateway.
-
-    CATCH cx_web_http_client_error INTO DATA(lx_web_http_client_error).
-      " Handle Exception
-*      RAISE SHORTDUMP lx_web_http_client_error.
-
-    CATCH cx_http_dest_provider_error INTO DATA(lx_http_dest_provider_error).
-        "handle exception
-*      RAISE SHORTDUMP lx_http_dest_provider_error.
-
-    ENDTRY.
+*    DATA system_url TYPE string.
+*
+*    DATA i_username TYPE string VALUE 'INBOUND_USER'.
+*    DATA i_password TYPE string VALUE 'rtrVDDgelabtTjUiybRX}tVD3JksqqfvPpBdJRaL'.
+*
+*    DATA text   TYPE string.
+*    DATA s1     TYPE string.
+*    DATA s2     TYPE string.
+*    DATA s3     TYPE string.
+*
+*    TRY.
+*
+** DATA(i_url) = 'https://my404898.s4hana.cloud.sap/sap/opu/odata/sap/YY1_COMMODITYCODE_CDS/YY1_COMMODITYCODE'.
+*
+*        system_url = cl_abap_context_info=>get_system_url( ).
+*
+**       Read list of objects and get UUID of the first
+*        CONCATENATE
+*                'https://'
+*                system_url(8) " my404898
+*                '-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_COMMODITYCODE_CDS/YY1_COMMODITYCODE'
+*            INTO DATA(i_url).
+*
+*        DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url = i_url ).
+*
+*        DATA(lo_http_client) = cl_web_http_client_manager=>create_by_http_destination( http_destination ).
+*
+*        lo_http_client->get_http_request( )->set_authorization_basic(
+*            i_username = i_username
+*            i_password = i_password
+*        ).
+*
+*        DATA(lo_http_request) = lo_http_client->get_http_request( ).
+*
+*        DATA(lo_http_response) = lo_http_client->execute(
+*            i_method   = if_web_http_client=>get
+*        ).
+*
+*        text                          = lo_http_response->get_text( ).
+*        DATA(status)                  = lo_http_response->get_status( ).
+*        DATA(response_header_fields)  = lo_http_response->get_header_fields( ).
+*
+*        REPLACE '<d:SAP_UUID>'    IN text WITH '******'.
+*        REPLACE '</d:SAP_UUID>'   IN text WITH '******'.
+*        SPLIT text AT '******' INTO s1 s2 s3.
+*
+*        DATA(sap_uuid) = s2.
+*
+*        CONCATENATE
+*                'https://'
+*                system_url(8) " my404898
+*                '-api.s4hana.cloud.sap/sap/opu/odata/sap/YY1_COMMODITYCODE_CDS/YY1_COMMODITYCODE'
+*                '(guid''' sap_uuid ''')' " '91bf6b38-1c0f-1ede-b2cf-0d3f0b77f0ff'
+*            INTO i_url.
+*
+*        http_destination = cl_http_destination_provider=>create_by_url( i_url = i_url ).
+*
+*        lo_http_client = cl_web_http_client_manager=>create_by_http_destination( http_destination ).
+*
+*        lo_http_client->get_http_request( )->set_authorization_basic(
+*            i_username = i_username
+*            i_password = i_password
+*        ).
+*
+*        lo_http_request = lo_http_client->get_http_request( ).
+*
+**       Get Token:
+*
+*        lo_http_request->set_header_field(
+*            i_name  = 'x-csrf-token'
+*            i_value = 'fetch'
+*        ).
+*
+*        lo_http_response = lo_http_client->execute(
+*            i_method   = if_web_http_client=>get
+*        ).
+*
+*        text                   = lo_http_response->get_text( ).
+*        status                 = lo_http_response->get_status( ).
+*        response_header_fields = lo_http_response->get_header_fields( ).
+*
+**        DATA token TYPE string.
+*        READ TABLE response_header_fields WITH KEY name = 'x-csrf-token' INTO DATA(field).
+*        IF ( sy-subrc = 0 ).
+*            DATA(token) = field-value.
+*        ENDIF.
+*
+**       Update Code:
+*
+*        DATA i_fields TYPE if_web_http_request=>name_value_pairs.
+*        APPEND VALUE #(
+*            name  = 'x-csrf-token'
+*            value = token " '5iGZK1qT45Vi4UfHYazbPQ=='
+*        )
+*        TO i_fields.
+*        APPEND VALUE #(
+*            name  = 'Content-Type'
+*            value = 'application/json'
+*        )
+*        TO i_fields.
+*
+*        lo_http_request->set_header_fields(
+*          EXPORTING
+*            i_fields = i_fields
+*        ).
+*
+*        lo_http_request->set_text(
+*            i_text   = '{"CODE":"' && i_code && '"}' " '62149000'
+*        ).
+*
+*        lo_http_response = lo_http_client->execute(
+*            i_method   = if_web_http_client=>put
+*        ).
+*
+*        text                      = lo_http_response->get_text( ).
+*        status                    = lo_http_response->get_status( ).
+*        response_header_fields    = lo_http_response->get_header_fields( ).
+*
+**       Read Description
+*
+*        lo_http_response = lo_http_client->execute(
+*            i_method   = if_web_http_client=>get
+*        ).
+*
+*        text                    = lo_http_response->get_text( ).
+*        status                  = lo_http_response->get_status( ).
+*        response_header_fields  = lo_http_response->get_header_fields( ).
+*
+*        REPLACE '<d:CODE>'    IN text WITH '***CODE***'.
+*        REPLACE '</d:CODE>'   IN text WITH '***CODE***'.
+*        SPLIT text AT '***CODE***' INTO s1 s2 s3.
+*        o_code = s2.
+*
+*        REPLACE '<d:DESCRIPTION>'    IN text WITH '***DESCRIPTION***'.
+*        REPLACE '</d:DESCRIPTION>'   IN text WITH '***DESCRIPTION***'.
+*        SPLIT text AT '***DESCRIPTION***' INTO s1 s2 s3.
+*        o_description = s2.
+*
+*    CATCH cx_web_message_error INTO DATA(lx_web_message_error).
+*      " Handle Exception
+**      RAISE SHORTDUMP lx_web_message_error.
+*
+*    CATCH cx_abap_context_info_error INTO DATA(lx_abap_context_info_error).
+*      " Handle Exception
+**      RAISE SHORTDUMP lx_abap_context_info_error.
+*
+*    CATCH /iwbep/cx_cp_remote INTO DATA(lx_remote).
+*      " Handle remote Exception
+**      RAISE SHORTDUMP lx_remote.
+*
+*    CATCH /iwbep/cx_gateway INTO DATA(lx_gateway).
+*      " Handle Exception
+**      RAISE SHORTDUMP lx_gateway.
+*
+*    CATCH cx_web_http_client_error INTO DATA(lx_web_http_client_error).
+*      " Handle Exception
+**      RAISE SHORTDUMP lx_web_http_client_error.
+*
+*    CATCH cx_http_dest_provider_error INTO DATA(lx_http_dest_provider_error).
+*        "handle exception
+**      RAISE SHORTDUMP lx_http_dest_provider_error.
+*
+*    ENDTRY.
 
   ENDMETHOD. " get_commodity_code_internal
 

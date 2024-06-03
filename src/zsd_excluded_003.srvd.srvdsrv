@@ -1,0 +1,4 @@
+@EndUserText.label: 'ZSD_EXCLUDED_003'
+define service ZSD_EXCLUDED_003 {
+  expose ZC_EXCLUDED_003;
+}

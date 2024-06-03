@@ -56,14 +56,17 @@ annotate entity ZC_SHIPMENT_003 with
     @UI: {  lineItem:       [ { position: 20, label: 'Shipment ID', cssDefault.width: '200px' } ],
             identification: [ { position: 20, label: 'Shipment ID' }, 
                               { type: #FOR_ACTION, dataAction: 'retrieve',                  label: 'Retrieve',                      position: 1 },
-                              { type: #FOR_ACTION, dataAction: 'add',                       label: 'Add',                           position: 2 },
-                              { type: #FOR_ACTION, dataAction: 'remove',                    label: 'Remove',                        position: 3 },
-                              { type: #FOR_ACTION, dataAction: 'release',                   label: 'Release',                       position: 4 },
-                              { type: #FOR_ACTION, dataAction: 'create_invoice',            label: 'Create Invoice',                position: 5 },
-                              { type: #FOR_ACTION, dataAction: 'create_tkz_list',           label: 'Create TKZ List',               position: 6 },
-                              { type: #FOR_ACTION, dataAction: 'create_tariff_document',    label: 'Create Tariff Document',        position: 7 },
-                              { type: #FOR_ACTION, dataAction: 'create_eci',                label: 'Create ECI csv',                position: 8 },
-                              { type: #FOR_ACTION, dataAction: 'create_exp_decl',           label: 'Create Export Declaration CH',  position: 9 } ] }
+                              { type: #FOR_ACTION, dataAction: 'select_all_available',      label: 'Select all Available',          position: 2 },
+                              { type: #FOR_ACTION, dataAction: 'select_all_added',          label: 'Select all Added',              position: 3 },
+                              { type: #FOR_ACTION, dataAction: 'add',                       label: 'Add',                           position: 4 },
+                              { type: #FOR_ACTION, dataAction: 'remove',                    label: 'Remove',                        position: 5 },
+                              { type: #FOR_ACTION, dataAction: 'exclude_from_available',    label: 'Exclude from Available',        position: 6 },
+                              { type: #FOR_ACTION, dataAction: 'release',                   label: 'Release',                       position: 7 },
+                              { type: #FOR_ACTION, dataAction: 'create_invoice',            label: 'Create Invoice',                position: 8 },
+                              { type: #FOR_ACTION, dataAction: 'create_tkz_list',           label: 'Create TKZ List',               position: 9 },
+                              { type: #FOR_ACTION, dataAction: 'create_tariff_document',    label: 'Create Tariff Document',        position: 10 },
+                              { type: #FOR_ACTION, dataAction: 'create_eci',                label: 'Create ECI csv',                position: 11 },
+                              { type: #FOR_ACTION, dataAction: 'create_exp_decl',           label: 'Create Export Declaration CH',  position: 12 } ] }
                               
     @EndUserText.label: 'Shipment ID'
     //@Search.defaultSearchElement 

@@ -34,6 +34,10 @@ CLASS ZCL_SHIPMENT_003 IMPLEMENTATION.
             i_username = 'INBOUND_FIEGE_USER'.
             i_password = 'JpLftkzhkoktLzvvoxD6oWeXsM#ZXccgfsBBzRpg'.
         ENDIF.
+        IF ( system_url(8) = 'my410080' ). " prod
+            i_username = 'INBOUND_FIEGE_USER'.
+            i_password = 'NjQbAZlnTaCcX)XidbvNbGRtPjT8grcVBizFwgCW'.
+        ENDIF.
 
         DATA(http_destination) = cl_http_destination_provider=>create_by_url( i_url ).
 

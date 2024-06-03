@@ -22,9 +22,9 @@ annotate entity ZC_AVAILABLE_003 with
     @UI.hidden: true
     AvailableUUID;
 
-    @UI: {  lineItem:       [ { position: 10, label: 'To Add', cssDefault.width: '50px' } ],
+    @UI: {  lineItem:       [ { position: 10, label: 'To Add/Excl', cssDefault.width: '50px' } ],
             identification: [ { position: 10, label: ' ' } ] }
-    @EndUserText.label: 'To Add'
+    @EndUserText.label: 'To Add/Excl'
 //    @UI.hidden: true
     Selected;
  

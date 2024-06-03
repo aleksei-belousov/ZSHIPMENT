@@ -1,0 +1,39 @@
+managed implementation in class zbp_i_excluded_003 unique;
+strict ( 2 );
+with draft;
+
+define behavior for ZI_EXCLUDED_003 alias Excluded
+persistent table zexcluded003
+draft table zexcluded003d
+lock master
+total etag LocalLastChangedAt
+authorization master ( instance )
+etag master LastChangedAt
+{
+  field ( readonly, numbering : managed ) ExcludedUUID;
+  field ( readonly ) SalesOrder;
+  field ( readonly ) PurchaseOrderByCustomer;
+
+  // administrative fields: read only
+  field ( readonly ) LastChangedAt, LastChangedBy, LocalLastChangedAt, CreatedBy, CreatedAt;
+
+  create;
+  update;
+  delete;
+
+  draft action Edit;
+  draft action Activate optimized;
+  draft action Discard;
+  draft action Resume;
+
+  draft determine action Prepare;
+
+  // Events:
+  determination on_create on modify { field ExcludedUUID; }
+  determination on_modify_delivery on modify { field OutboundDelivery; }
+
+  side effects {
+    field OutboundDelivery affects field SalesOrder, field PurchaseOrderByCustomer;
+  }
+
+}

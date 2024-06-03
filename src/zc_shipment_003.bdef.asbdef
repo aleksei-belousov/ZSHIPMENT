@@ -15,9 +15,12 @@ define behavior for ZC_SHIPMENT_003 alias Shipment
   use action Discard;
   use action Prepare;
 
+  use action retrieve;
+  use action select_all_available;
+  use action select_all_added;
   use action add;
   use action remove;
-  use action retrieve;
+  use action exclude_from_available;
   use action release;
   use action create_invoice; // pdf
   use action create_tkz_list; // pdf

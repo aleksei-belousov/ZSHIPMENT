@@ -22,8 +22,11 @@ etag master LocalLastChangedAt
 
   // Actions:
   action retrieve;
+  action select_all_available;
+  action select_all_added;
   action add;
   action remove;
+  action exclude_from_available;
   action release;
   action create_invoice; // pdf
   action create_tkz_list; // pdf
@@ -50,8 +53,11 @@ etag master LocalLastChangedAt
   {
     field PartyID affects $self;
     action retrieve affects entity _Available;
+    action select_all_available affects entity _Available;
+    action select_all_added affects entity _Outbound;
     action add affects entity _Available, entity _Outbound;
     action remove affects entity _Available, entity _Outbound;
+    action exclude_from_available affects entity _Available;
     action release affects field Released, field ReleaseDate;
     action create_tariff_document affects entity _Attachment;
     action create_eci affects entity _Attachment;
